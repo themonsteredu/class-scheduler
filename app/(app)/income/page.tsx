@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { requireUser } from "@/lib/supabase/server";
 import { monthRange, thisMonthKST } from "@/lib/date";
-import { computeMyNet, fmtKRW, sumExtras } from "@/lib/money";
+import { fmtKRW } from "@/lib/money";
 import {
   Card,
   CardContent,
@@ -44,60 +44,34 @@ export default async function IncomePage({
 
   const rows = (data ?? []) as unknown as ClassRequestRow[];
 
-  const gross = rows.reduce((a, r) => a + Number(r.fee_total ?? 0), 0);
-  const paidToInstructors = rows.reduce(
-    (a, r) => a + Number(r.instructor_payout ?? 0),
-    0,
-  );
-  const myCommission = rows.reduce(
-    (a, r) => a + Number(r.my_commission ?? 0),
-    0,
-  );
-  const myExtra = rows.reduce((a, r) => a + sumExtras(r.extra_fees, "me"), 0);
-  const myNet = myCommission + myExtra;
+  const totalIncome = rows.reduce((a, r) => a + Number(r.fee_total ?? 0), 0);
+  const classCount = rows.length;
 
   // by instructor
   const byInstructor = new Map<
     string,
-    { name: string; count: number; gross: number; payout: number; myNet: number }
+    { name: string; count: number; income: number }
   >();
   for (const r of rows) {
     const key = r.instructor_id ?? "__self__";
     const name = r.instructor?.name ?? "본인 직접";
-    const cur = byInstructor.get(key) ?? {
-      name,
-      count: 0,
-      gross: 0,
-      payout: 0,
-      myNet: 0,
-    };
+    const cur = byInstructor.get(key) ?? { name, count: 0, income: 0 };
     cur.count += 1;
-    cur.gross += Number(r.fee_total ?? 0);
-    cur.payout += Number(r.instructor_payout ?? 0);
-    cur.myNet += computeMyNet({
-      fee_total: r.fee_total,
-      instructor_payout: r.instructor_payout,
-      extra_fees: r.extra_fees,
-    });
+    cur.income += Number(r.fee_total ?? 0);
     byInstructor.set(key, cur);
   }
 
   // by client
   const byClient = new Map<
     string,
-    { name: string; count: number; gross: number; myNet: number }
+    { name: string; count: number; income: number }
   >();
   for (const r of rows) {
     const key = r.client_id ?? "__none__";
     const name = r.client?.name ?? "(업체 미정)";
-    const cur = byClient.get(key) ?? { name, count: 0, gross: 0, myNet: 0 };
+    const cur = byClient.get(key) ?? { name, count: 0, income: 0 };
     cur.count += 1;
-    cur.gross += Number(r.fee_total ?? 0);
-    cur.myNet += computeMyNet({
-      fee_total: r.fee_total,
-      instructor_payout: r.instructor_payout,
-      extra_fees: r.extra_fees,
-    });
+    cur.income += Number(r.fee_total ?? 0);
     byClient.set(key, cur);
   }
 
@@ -117,18 +91,9 @@ export default async function IncomePage({
         </Suspense>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Kpi title="총 매출" value={fmtKRW(gross)} hint="수강료 합계" />
-        <Kpi
-          title="강사 지급 합계"
-          value={fmtKRW(paidToInstructors)}
-        />
-        <Kpi title="내 수수료" value={fmtKRW(myCommission)} />
-        <Kpi
-          title="내 순수입"
-          value={fmtKRW(myNet)}
-          hint={`수수료 + 본인 부가수입(${fmtKRW(myExtra)})`}
-        />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Kpi title="내 수입 합계" value={fmtKRW(totalIncome)} />
+        <Kpi title="수업 건수" value={`${classCount}건`} />
       </div>
 
       <Tabs defaultValue="by-class">
@@ -145,9 +110,7 @@ export default async function IncomePage({
             </CardHeader>
             <CardContent>
               {rows.length === 0 ? (
-                <div className="py-8 text-center text-sm text-muted-foreground">
-                  집계할 수업이 없습니다.
-                </div>
+                <Empty />
               ) : (
                 <Table>
                   <TableHeader>
@@ -156,9 +119,7 @@ export default async function IncomePage({
                       <TableHead>학교·과목</TableHead>
                       <TableHead>강사</TableHead>
                       <TableHead>업체</TableHead>
-                      <TableHead className="text-right">매출</TableHead>
-                      <TableHead className="text-right">강사료</TableHead>
-                      <TableHead className="text-right">내 순수입</TableHead>
+                      <TableHead className="text-right">내 수입</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -177,20 +138,8 @@ export default async function IncomePage({
                           {r.instructor?.name ?? "본인 직접"}
                         </TableCell>
                         <TableCell>{r.client?.name ?? "—"}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {fmtKRW(r.fee_total)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {fmtKRW(r.instructor_payout)}
-                        </TableCell>
                         <TableCell className="text-right tabular-nums font-medium">
-                          {fmtKRW(
-                            computeMyNet({
-                              fee_total: r.fee_total,
-                              instructor_payout: r.instructor_payout,
-                              extra_fees: r.extra_fees,
-                            }),
-                          )}
+                          {fmtKRW(r.fee_total)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -215,28 +164,20 @@ export default async function IncomePage({
                     <TableRow>
                       <TableHead>강사</TableHead>
                       <TableHead className="text-right">수업 수</TableHead>
-                      <TableHead className="text-right">매출</TableHead>
-                      <TableHead className="text-right">강사료 지급</TableHead>
-                      <TableHead className="text-right">내 순수입</TableHead>
+                      <TableHead className="text-right">내 수입</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {[...byInstructor.values()]
-                      .sort((a, b) => b.myNet - a.myNet)
+                      .sort((a, b) => b.income - a.income)
                       .map((row) => (
                         <TableRow key={row.name}>
                           <TableCell className="font-medium">{row.name}</TableCell>
                           <TableCell className="text-right tabular-nums">
                             {row.count}
                           </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {fmtKRW(row.gross)}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {fmtKRW(row.payout)}
-                          </TableCell>
                           <TableCell className="text-right tabular-nums font-medium">
-                            {fmtKRW(row.myNet)}
+                            {fmtKRW(row.income)}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -261,24 +202,20 @@ export default async function IncomePage({
                     <TableRow>
                       <TableHead>업체</TableHead>
                       <TableHead className="text-right">수업 수</TableHead>
-                      <TableHead className="text-right">매출</TableHead>
-                      <TableHead className="text-right">내 순수입</TableHead>
+                      <TableHead className="text-right">내 수입</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {[...byClient.values()]
-                      .sort((a, b) => b.myNet - a.myNet)
+                      .sort((a, b) => b.income - a.income)
                       .map((row) => (
                         <TableRow key={row.name}>
                           <TableCell className="font-medium">{row.name}</TableCell>
                           <TableCell className="text-right tabular-nums">
                             {row.count}
                           </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {fmtKRW(row.gross)}
-                          </TableCell>
                           <TableCell className="text-right tabular-nums font-medium">
-                            {fmtKRW(row.myNet)}
+                            {fmtKRW(row.income)}
                           </TableCell>
                         </TableRow>
                       ))}

@@ -34,7 +34,7 @@ export default async function RequestDetailPage({
       .order("name"),
     supabase
       .from("instructors")
-      .select("id,name,active,default_payout")
+      .select("id,name,active")
       .eq("user_id", user.id)
       .order("active", { ascending: false })
       .order("name"),
@@ -45,7 +45,7 @@ export default async function RequestDetailPage({
   const clients = (clientsRes.data ?? []) as Pick<ClientRow, "id" | "name">[];
   const instructors = (instructorsRes.data ?? []) as Pick<
     InstructorRow,
-    "id" | "name" | "active" | "default_payout"
+    "id" | "name" | "active"
   >[];
 
   return (

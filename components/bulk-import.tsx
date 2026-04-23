@@ -37,7 +37,7 @@ import { fmtKRW } from "@/lib/money";
 
 interface Props {
   clients: Pick<ClientRow, "id" | "name">[];
-  instructors: Pick<InstructorRow, "id" | "name" | "active" | "default_payout">[];
+  instructors: Pick<InstructorRow, "id" | "name" | "active">[];
 }
 
 interface Row {
@@ -52,7 +52,6 @@ interface Row {
   grade: string;
   student_count: string;
   fee_total: string;
-  instructor_payout: string;
   status: RequestStatus;
   memo: string;
   _notes?: string | null;
@@ -92,14 +91,12 @@ function matchInstructor(
 function toRow(
   r: ParseResult,
   clients: Pick<ClientRow, "id" | "name">[],
-  instructors: Pick<InstructorRow, "id" | "name" | "default_payout">[],
+  instructors: Pick<InstructorRow, "id" | "name">[],
 ): Row {
-  const instrId = matchInstructor(r.instructor_name_guess, instructors);
-  const instr = instructors.find((i) => i.id === instrId);
   return {
     include: true,
     client_id: matchClient(r.client_name_guess, clients),
-    instructor_id: instrId,
+    instructor_id: matchInstructor(r.instructor_name_guess, instructors),
     school_name: r.school_name ?? "",
     class_date: r.class_date ?? "",
     start_time: r.start_time ?? "",
@@ -108,8 +105,6 @@ function toRow(
     grade: r.grade ?? "",
     student_count: r.student_count != null ? String(r.student_count) : "",
     fee_total: r.fee_guess != null ? String(r.fee_guess) : "",
-    instructor_payout:
-      instr?.default_payout != null ? String(instr.default_payout) : "",
     status: "의뢰접수",
     memo: "",
     _notes: r.notes ?? null,
@@ -188,8 +183,7 @@ export function BulkImport({ clients, instructors }: Props) {
           grade: r.grade || null,
           student_count: r.student_count === "" ? null : Number(r.student_count),
           fee_total: r.fee_total === "" ? null : Number(r.fee_total),
-          instructor_payout:
-            r.instructor_payout === "" ? null : Number(r.instructor_payout),
+          instructor_payout: 0,
           extra_fees: [],
           status: r.status,
           raw_message: null,
@@ -210,9 +204,6 @@ export function BulkImport({ clients, instructors }: Props) {
   const totalFee = rows
     .filter((r) => r.include)
     .reduce((a, r) => a + (Number(r.fee_total) || 0), 0);
-  const totalPayout = rows
-    .filter((r) => r.include)
-    .reduce((a, r) => a + (Number(r.instructor_payout) || 0), 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -264,8 +255,7 @@ export function BulkImport({ clients, instructors }: Props) {
                     <TableHead className="min-w-[70px]">인원</TableHead>
                     <TableHead className="min-w-[140px]">강사</TableHead>
                     <TableHead className="min-w-[140px]">업체</TableHead>
-                    <TableHead className="min-w-[110px] text-right">총액</TableHead>
-                    <TableHead className="min-w-[110px] text-right">강사료</TableHead>
+                    <TableHead className="min-w-[120px] text-right">내 수입</TableHead>
                     <TableHead className="min-w-[110px]">상태</TableHead>
                     <TableHead className="w-10"></TableHead>
                   </TableRow>
@@ -337,20 +327,9 @@ export function BulkImport({ clients, instructors }: Props) {
                       <TableCell>
                         <Select
                           value={r.instructor_id ?? SELF}
-                          onValueChange={(v) => {
-                            if (v === SELF) {
-                              update(idx, { instructor_id: null });
-                            } else {
-                              update(idx, { instructor_id: v });
-                              const instr = instructors.find((i) => i.id === v);
-                              if (instr?.default_payout && !r.instructor_payout) {
-                                update(idx, {
-                                  instructor_id: v,
-                                  instructor_payout: String(instr.default_payout),
-                                });
-                              }
-                            }
-                          }}
+                          onValueChange={(v) =>
+                            update(idx, { instructor_id: v === SELF ? null : v })
+                          }
                         >
                           <SelectTrigger className="h-8">
                             <SelectValue />
@@ -393,17 +372,6 @@ export function BulkImport({ clients, instructors }: Props) {
                           inputMode="numeric"
                           value={r.fee_total}
                           onChange={(e) => update(idx, { fee_total: e.target.value })}
-                          className="h-8 text-right"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          inputMode="numeric"
-                          value={r.instructor_payout}
-                          onChange={(e) =>
-                            update(idx, { instructor_payout: e.target.value })
-                          }
                           className="h-8 text-right"
                         />
                       </TableCell>
@@ -461,7 +429,7 @@ export function BulkImport({ clients, instructors }: Props) {
 
             <div className="flex items-center justify-between gap-3 pt-2 border-t">
               <div className="text-sm text-muted-foreground">
-                선택 {selectedCount}건 · 총액 {fmtKRW(totalFee)} · 강사료 합계 {fmtKRW(totalPayout)}
+                선택 {selectedCount}건 · 내 수입 합계 {fmtKRW(totalFee)}
               </div>
               <div className="flex gap-2">
                 <Button

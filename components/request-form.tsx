@@ -9,12 +9,10 @@ import { Loader2, Trash2 } from "lucide-react";
 import {
   requestFormSchema,
   STATUS_VALUES,
-  type ExtraFee,
   type ParseResult,
   type RequestFormValues,
   type RequestStatus,
 } from "@/lib/schemas";
-import { computeMyNet, fmtKRW } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +26,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { KakaoPasteParser } from "@/components/kakao-paste-parser";
-import { ExtraFeesEditor } from "@/components/extra-fees-editor";
 import { createRequest, deleteRequest, updateRequest } from "@/actions/requests";
 import type { ClassRequestRow, ClientRow, InstructorRow } from "@/types/database";
 
@@ -36,7 +33,7 @@ interface Props {
   mode: "new" | "edit";
   request?: ClassRequestRow;
   clients: Pick<ClientRow, "id" | "name">[];
-  instructors: Pick<InstructorRow, "id" | "name" | "active" | "default_payout">[];
+  instructors: Pick<InstructorRow, "id" | "name" | "active">[];
 }
 
 const SELF_INSTRUCTOR = "__self__";
@@ -72,8 +69,8 @@ export function RequestForm({ mode, request, clients, instructors }: Props) {
       grade: request?.grade ?? "",
       student_count: request?.student_count ?? null,
       fee_total: request?.fee_total ?? null,
-      instructor_payout: request?.instructor_payout ?? null,
-      extra_fees: (request?.extra_fees ?? []) as ExtraFee[],
+      instructor_payout: 0,
+      extra_fees: [],
       status: request?.status ?? "의뢰접수",
       raw_message: request?.raw_message ?? "",
       memo: request?.memo ?? "",
@@ -81,11 +78,6 @@ export function RequestForm({ mode, request, clients, instructors }: Props) {
   });
 
   const watched = form.watch();
-  const myNet = computeMyNet({
-    fee_total: toNumber(watched.fee_total),
-    instructor_payout: toNumber(watched.instructor_payout),
-    extra_fees: (watched.extra_fees ?? []) as ExtraFee[],
-  });
 
   function applyParsed(result: ParseResult, raw: string) {
     setParsedMeta(result);
@@ -212,20 +204,9 @@ export function RequestForm({ mode, request, clients, instructors }: Props) {
             render={({ field }) => (
               <Select
                 value={field.value ?? SELF_INSTRUCTOR}
-                onValueChange={(v) => {
-                  if (v === SELF_INSTRUCTOR) {
-                    field.onChange(null);
-                  } else {
-                    field.onChange(v);
-                    const instructor = instructors.find((i) => i.id === v);
-                    if (
-                      instructor?.default_payout &&
-                      !form.getValues("instructor_payout")
-                    ) {
-                      form.setValue("instructor_payout", instructor.default_payout);
-                    }
-                  }
-                }}
+                onValueChange={(v) =>
+                  field.onChange(v === SELF_INSTRUCTOR ? null : v)
+                }
               >
                 <SelectTrigger>
                   <SelectValue placeholder="강사 선택" />
@@ -277,19 +258,11 @@ export function RequestForm({ mode, request, clients, instructors }: Props) {
           />
         </Field>
 
-        <Field label={<>총 의뢰금액 (원) <ConfidenceBadge field="fee_guess" /></>}>
+        <Field label={<>내 수입 (원) <ConfidenceBadge field="fee_guess" /></>}>
           <Input
             type="number"
             inputMode="numeric"
             {...form.register("fee_total")}
-          />
-        </Field>
-
-        <Field label="강사 지급액 (원)">
-          <Input
-            type="number"
-            inputMode="numeric"
-            {...form.register("instructor_payout")}
           />
         </Field>
 
@@ -319,20 +292,6 @@ export function RequestForm({ mode, request, clients, instructors }: Props) {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>부가 항목 (교통비·자료비 등)</Label>
-        <Controller
-          control={form.control}
-          name="extra_fees"
-          render={({ field }) => (
-            <ExtraFeesEditor
-              value={(field.value ?? []) as ExtraFee[]}
-              onChange={(v) => field.onChange(v)}
-            />
-          )}
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
         <Label htmlFor="memo">메모</Label>
         <Textarea id="memo" rows={3} {...form.register("memo")} />
       </div>
@@ -349,11 +308,6 @@ export function RequestForm({ mode, request, clients, instructors }: Props) {
           />
         </details>
       )}
-
-      <div className="rounded-lg border bg-muted/30 p-4 flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">본인 순수입 (예상)</div>
-        <div className="text-xl font-semibold tabular-nums">{fmtKRW(myNet)}</div>
-      </div>
 
       <div className="flex justify-between">
         {mode === "edit" && request ? (
@@ -401,8 +355,3 @@ function Field({
   );
 }
 
-function toNumber(v: unknown): number {
-  if (v === "" || v == null) return 0;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}

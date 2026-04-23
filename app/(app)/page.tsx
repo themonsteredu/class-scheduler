@@ -1,9 +1,29 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/supabase/server";
-import { monthRange, thisMonthKST, todayISO, fmtTimeRange } from "@/lib/date";
-import { fmtKRW, computeMyNet } from "@/lib/money";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  monthRange,
+  thisMonthKST,
+  todayISO,
+  fmtTimeRange,
+} from "@/lib/date";
+import { fmtKRW } from "@/lib/money";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { StatusBadge } from "@/components/status-badge";
+import { MonthCalendar } from "@/components/month-calendar";
 import type { ClassRequestRow } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -13,49 +33,61 @@ export default async function DashboardPage() {
   const ym = thisMonthKST();
   const { start, end } = monthRange(ym);
 
+  // Current + previous + next month (for calendar navigation range)
   const { data: monthRows } = await supabase
     .from("class_requests")
     .select("*, client:clients(id,name), instructor:instructors(id,name)")
     .eq("user_id", user.id)
-    .gte("class_date", start)
-    .lt("class_date", end)
     .order("class_date", { ascending: true });
 
-  const rows = (monthRows ?? []) as unknown as ClassRequestRow[];
-  const active = rows.filter((r) => r.status !== "취소");
-  const totalCount = active.length;
-  const expectedGross = active.reduce((acc, r) => acc + Number(r.fee_total ?? 0), 0);
+  const allRows = (monthRows ?? []) as unknown as ClassRequestRow[];
 
-  const confirmed = rows.filter(
-    (r) => r.status === "수업완료" || r.status === "정산완료",
+  const currentMonthRows = allRows.filter(
+    (r) =>
+      r.class_date &&
+      r.class_date >= start &&
+      r.class_date < end &&
+      r.status !== "취소",
   );
-  const myCommission = confirmed.reduce(
-    (acc, r) => acc + Number(r.my_commission ?? 0),
+  const totalCount = currentMonthRows.length;
+  const expectedIncome = currentMonthRows.reduce(
+    (acc, r) => acc + Number(r.fee_total ?? 0),
     0,
   );
-  const myNet = confirmed.reduce(
-    (acc, r) =>
-      acc +
-      computeMyNet({
-        fee_total: r.fee_total,
-        instructor_payout: r.instructor_payout,
-        extra_fees: r.extra_fees,
-      }),
-    0,
-  );
+  const confirmedIncome = currentMonthRows
+    .filter((r) => r.status === "수업완료" || r.status === "정산완료")
+    .reduce((acc, r) => acc + Number(r.fee_total ?? 0), 0);
 
   const today = todayISO();
-  const { data: upcomingRows } = await supabase
-    .from("class_requests")
-    .select("*, client:clients(id,name), instructor:instructors(id,name)")
-    .eq("user_id", user.id)
-    .gte("class_date", today)
-    .neq("status", "취소")
-    .order("class_date", { ascending: true })
-    .order("start_time", { ascending: true })
-    .limit(5);
+  const upcoming = allRows
+    .filter(
+      (r) => r.class_date && r.class_date >= today && r.status !== "취소",
+    )
+    .slice(0, 5);
 
-  const upcoming = (upcomingRows ?? []) as unknown as ClassRequestRow[];
+  // by instructor (all future + current month)
+  const byInstructor = new Map<
+    string,
+    { name: string; active: ClassRequestRow[]; past: ClassRequestRow[] }
+  >();
+  for (const r of allRows) {
+    if (r.status === "취소") continue;
+    const key = r.instructor_id ?? "__self__";
+    const name = r.instructor?.name ?? "본인 직접";
+    const cur = byInstructor.get(key) ?? { name, active: [], past: [] };
+    if (r.class_date && r.class_date >= today) {
+      cur.active.push(r);
+    } else {
+      cur.past.push(r);
+    }
+    byInstructor.set(key, cur);
+  }
+  const instructorList = [...byInstructor.values()]
+    .sort((a, b) => {
+      if (a.name === "본인 직접") return -1;
+      if (b.name === "본인 직접") return 1;
+      return b.active.length - a.active.length;
+    });
 
   return (
     <div className="flex flex-col gap-6">
@@ -66,65 +98,165 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Kpi title="이번 달 의뢰" value={`${totalCount}건`} hint="취소 제외" />
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Kpi title="이번 달 수업" value={`${totalCount}건`} hint="취소 제외" />
         <Kpi
-          title="예상 총 매출"
-          value={fmtKRW(expectedGross)}
-          hint="모든 의뢰 합계"
+          title="예상 수입"
+          value={fmtKRW(expectedIncome)}
+          hint="모든 상태 합계"
         />
         <Kpi
-          title="확정 내 수수료"
-          value={fmtKRW(myCommission)}
+          title="확정 수입"
+          value={fmtKRW(confirmedIncome)}
           hint="수업완료·정산완료"
-        />
-        <Kpi
-          title="이번 달 순수입"
-          value={fmtKRW(myNet)}
-          hint="수수료 + 본인 부가수입"
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>다가오는 수업</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {upcoming.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-6 text-center">
-              예정된 수업이 없습니다.
-            </div>
-          ) : (
-            <ul className="divide-y">
-              {upcoming.map((r) => (
-                <li key={r.id}>
-                  <Link
-                    href={`/requests/${r.id}`}
-                    className="flex items-center justify-between py-3 gap-4 hover:bg-accent/50 -mx-2 px-2 rounded-md"
-                  >
-                    <div className="flex flex-col">
-                      <div className="text-sm font-medium">
-                        {r.school_name ?? "(학교 미정)"} · {r.subject ?? "과목 미정"}
+      <Tabs defaultValue="calendar">
+        <TabsList>
+          <TabsTrigger value="calendar">달력</TabsTrigger>
+          <TabsTrigger value="upcoming">다가오는 수업</TabsTrigger>
+          <TabsTrigger value="by-instructor">강사별</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="calendar">
+          <Card>
+            <CardContent className="pt-6">
+              <MonthCalendar rows={allRows} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="upcoming">
+          <Card>
+            <CardHeader>
+              <CardTitle>다가오는 수업</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {upcoming.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-6 text-center">
+                  예정된 수업이 없습니다.
+                </div>
+              ) : (
+                <ul className="divide-y">
+                  {upcoming.map((r) => (
+                    <li key={r.id}>
+                      <Link
+                        href={`/requests/${r.id}`}
+                        className="flex items-center justify-between py-3 gap-4 hover:bg-accent/50 -mx-2 px-2 rounded-md"
+                      >
+                        <div className="flex flex-col">
+                          <div className="text-sm font-medium">
+                            {r.school_name ?? "(학교 미정)"} ·{" "}
+                            {r.subject ?? "과목 미정"}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {r.class_date}{" "}
+                            {fmtTimeRange(r.start_time, r.end_time)} ·{" "}
+                            {r.instructor?.name ?? "본인 직접"} ·{" "}
+                            {r.client?.name ?? "(업체 미정)"}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-sm tabular-nums">
+                            {fmtKRW(r.fee_total)}
+                          </div>
+                          <StatusBadge status={r.status} />
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="by-instructor">
+          <Card>
+            <CardHeader>
+              <CardTitle>강사별 수업</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {instructorList.length === 0 ? (
+                <div className="text-sm text-muted-foreground py-6 text-center">
+                  등록된 수업이 없습니다.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-6">
+                  {instructorList.map((g) => (
+                    <div key={g.name} className="flex flex-col gap-2">
+                      <div className="flex items-baseline justify-between">
+                        <h3 className="text-base font-semibold">{g.name}</h3>
+                        <div className="text-xs text-muted-foreground">
+                          예정 {g.active.length}건 · 지난 {g.past.length}건
+                        </div>
                       </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {r.class_date} {fmtTimeRange(r.start_time, r.end_time)} ·{" "}
-                        {r.instructor?.name ?? "본인 직접"} ·{" "}
-                        {r.client?.name ?? "(업체 미정)"}
-                      </div>
+                      {g.active.length === 0 ? (
+                        <div className="text-sm text-muted-foreground">
+                          예정된 수업이 없습니다.
+                        </div>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>날짜</TableHead>
+                              <TableHead>시간</TableHead>
+                              <TableHead>학교·과목</TableHead>
+                              <TableHead>업체</TableHead>
+                              <TableHead className="text-right">
+                                내 수입
+                              </TableHead>
+                              <TableHead>상태</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {g.active.map((r) => (
+                              <TableRow key={r.id}>
+                                <TableCell>
+                                  <Link
+                                    href={`/requests/${r.id}`}
+                                    className="block"
+                                  >
+                                    {r.class_date ?? "—"}
+                                  </Link>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">
+                                  {fmtTimeRange(r.start_time, r.end_time)}
+                                </TableCell>
+                                <TableCell>
+                                  <Link
+                                    href={`/requests/${r.id}`}
+                                    className="block"
+                                  >
+                                    <div className="font-medium">
+                                      {r.school_name ?? "—"}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {r.subject ?? "—"}
+                                    </div>
+                                  </Link>
+                                </TableCell>
+                                <TableCell>{r.client?.name ?? "—"}</TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                  {fmtKRW(r.fee_total)}
+                                </TableCell>
+                                <TableCell>
+                                  <StatusBadge status={r.status} />
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-sm tabular-nums">
-                        {fmtKRW(r.fee_total)}
-                      </div>
-                      <StatusBadge status={r.status} />
-                    </div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

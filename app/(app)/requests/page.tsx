@@ -91,10 +91,6 @@ export default async function RequestsPage({
   const rows = (data ?? []) as unknown as ClassRequestRow[];
 
   const totalFee = rows.reduce((acc, r) => acc + Number(r.fee_total ?? 0), 0);
-  const totalCommission = rows.reduce(
-    (acc, r) => acc + Number(r.my_commission ?? 0),
-    0,
-  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -102,8 +98,7 @@ export default async function RequestsPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">의뢰 목록</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            총 {rows.length}건 · 합계 {fmtKRW(totalFee)} · 내 수수료{" "}
-            {fmtKRW(totalCommission)}
+            총 {rows.length}건 · 내 수입 합계 {fmtKRW(totalFee)}
           </p>
         </div>
         <Button asChild>
@@ -142,8 +137,7 @@ export default async function RequestsPage({
                   <TableHead>학년·인원</TableHead>
                   <TableHead>강사</TableHead>
                   <TableHead>업체</TableHead>
-                  <TableHead className="text-right">총액</TableHead>
-                  <TableHead className="text-right">내 수수료</TableHead>
+                  <TableHead className="text-right">내 수입</TableHead>
                   <TableHead>상태</TableHead>
                 </TableRow>
               </TableHeader>
@@ -193,9 +187,6 @@ export default async function RequestsPage({
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {fmtKRW(r.fee_total)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {fmtKRW(r.my_commission)}
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={r.status} />
