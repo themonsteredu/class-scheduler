@@ -11,5 +11,9 @@ const MAP: Record<RequestStatus, { label: string; variant: "default" | "secondar
 
 export function StatusBadge({ status }: { status: RequestStatus }) {
   const m = MAP[status] ?? { label: status, variant: "outline" as const };
-  return <Badge variant={m.variant}>{m.label}</Badge>;
+  return (
+    <Badge variant={m.variant} className="whitespace-nowrap shrink-0">
+      {m.label}
+    </Badge>
+  );
 }

@@ -4,7 +4,7 @@ import {
   monthRange,
   thisMonthKST,
   todayISO,
-  fmtTimeRange,
+  fmtCompactWhen,
 } from "@/lib/date";
 import { fmtKRW } from "@/lib/money";
 import {
@@ -14,14 +14,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { StatusBadge } from "@/components/status-badge";
 import { MonthCalendar } from "@/components/month-calendar";
 import type { ClassRequestRow } from "@/types/database";
@@ -143,25 +135,27 @@ export default async function DashboardPage() {
                     <li key={r.id}>
                       <Link
                         href={`/requests/${r.id}`}
-                        className="flex items-center justify-between py-3 gap-4 hover:bg-accent/50 -mx-2 px-2 rounded-md"
+                        className="flex items-center justify-between gap-3 py-3 hover:bg-accent/50 -mx-2 px-2 rounded-md"
                       >
-                        <div className="flex flex-col">
-                          <div className="text-sm font-medium">
-                            {r.school_name ?? "(학교 미정)"} ·{" "}
-                            {r.subject ?? "과목 미정"}
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <div className="text-xs text-muted-foreground tabular-nums">
+                            {fmtCompactWhen(r.class_date, r.start_time)}
                           </div>
-                          <div className="text-xs text-muted-foreground mt-0.5">
-                            {r.class_date}{" "}
-                            {fmtTimeRange(r.start_time, r.end_time)} ·{" "}
-                            {r.instructor?.name ?? "본인 직접"} ·{" "}
-                            {r.client?.name ?? "(업체 미정)"}
+                          <div className="text-sm font-medium truncate">
+                            {r.school_name ?? "(학교 미정)"}
+                          </div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {r.subject ?? "과목 미정"} ·{" "}
+                            {r.instructor?.name ?? "본인 직접"}
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-sm tabular-nums">
-                            {fmtKRW(r.fee_total)}
-                          </div>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
                           <StatusBadge status={r.status} />
+                          {Number(r.fee_total) > 0 && (
+                            <div className="text-xs tabular-nums text-muted-foreground">
+                              {fmtKRW(r.fee_total)}
+                            </div>
+                          )}
                         </div>
                       </Link>
                     </li>
@@ -183,76 +177,53 @@ export default async function DashboardPage() {
                   등록된 수업이 없습니다.
                 </div>
               ) : (
-                <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-5">
                   {instructorList.map((g) => (
                     <div key={g.name} className="flex flex-col gap-2">
-                      <div className="flex items-baseline justify-between">
-                        <h3 className="text-base font-semibold">{g.name}</h3>
-                        <div className="text-xs text-muted-foreground">
-                          예정 {g.active.length}건 · 지난 {g.past.length}건
+                      <div className="flex items-center justify-between gap-3 pb-1 border-b">
+                        <h3 className="text-sm sm:text-base font-semibold truncate">
+                          {g.name}
+                        </h3>
+                        <div className="text-xs text-muted-foreground shrink-0">
+                          예정 {g.active.length} · 지난 {g.past.length}
                         </div>
                       </div>
                       {g.active.length === 0 ? (
-                        <div className="text-sm text-muted-foreground">
+                        <div className="text-xs text-muted-foreground py-2">
                           예정된 수업이 없습니다.
                         </div>
                       ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>날짜</TableHead>
-                              <TableHead className="hidden sm:table-cell">시간</TableHead>
-                              <TableHead>학교·과목</TableHead>
-                              <TableHead className="hidden md:table-cell">업체</TableHead>
-                              <TableHead className="text-right">
-                                내 수입
-                              </TableHead>
-                              <TableHead>상태</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {g.active.map((r) => (
-                              <TableRow key={r.id}>
-                                <TableCell className="whitespace-nowrap">
-                                  <Link
-                                    href={`/requests/${r.id}`}
-                                    className="block"
-                                  >
-                                    {r.class_date ?? "—"}
-                                  </Link>
-                                </TableCell>
-                                <TableCell className="hidden sm:table-cell text-muted-foreground">
-                                  {fmtTimeRange(r.start_time, r.end_time)}
-                                </TableCell>
-                                <TableCell>
-                                  <Link
-                                    href={`/requests/${r.id}`}
-                                    className="block"
-                                  >
-                                    <div className="font-medium">
-                                      {r.school_name ?? "—"}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                      {r.subject ?? "—"} · {fmtTimeRange(r.start_time, r.end_time)}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground md:hidden">
-                                      {r.client?.name ?? ""}
-                                    </div>
-                                  </Link>
-                                </TableCell>
-                                <TableCell className="hidden md:table-cell">
-                                  {r.client?.name ?? "—"}
-                                </TableCell>
-                                <TableCell className="text-right tabular-nums whitespace-nowrap">
-                                  {fmtKRW(r.fee_total)}
-                                </TableCell>
-                                <TableCell>
+                        <ul className="divide-y">
+                          {g.active.map((r) => (
+                            <li key={r.id}>
+                              <Link
+                                href={`/requests/${r.id}`}
+                                className="flex items-center justify-between gap-3 py-2 hover:bg-accent/50 -mx-2 px-2 rounded-md"
+                              >
+                                <div className="flex flex-col min-w-0 flex-1">
+                                  <div className="text-xs text-muted-foreground tabular-nums">
+                                    {fmtCompactWhen(r.class_date, r.start_time)}
+                                  </div>
+                                  <div className="text-sm font-medium truncate">
+                                    {r.school_name ?? "—"}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground truncate">
+                                    {r.subject ?? "—"}
+                                    {r.client?.name ? ` · ${r.client.name}` : ""}
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-1 shrink-0">
                                   <StatusBadge status={r.status} />
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                                  {Number(r.fee_total) > 0 && (
+                                    <div className="text-xs tabular-nums text-muted-foreground">
+                                      {fmtKRW(r.fee_total)}
+                                    </div>
+                                  )}
+                                </div>
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
                       )}
                     </div>
                   ))}

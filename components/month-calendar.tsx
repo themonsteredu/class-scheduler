@@ -166,9 +166,9 @@ export function MonthCalendar({ rows }: Props) {
       </div>
 
       {selected && (
-        <div className="flex flex-col gap-2 rounded-lg border p-4">
+        <div className="flex flex-col gap-2 rounded-lg border p-3 sm:p-4">
           <div className="text-sm font-semibold">
-            {selected} 수업 {selectedRows.length}건
+            {selected} · 수업 {selectedRows.length}건
           </div>
           {selectedRows.length === 0 ? (
             <div className="text-sm text-muted-foreground py-3">
@@ -182,21 +182,25 @@ export function MonthCalendar({ rows }: Props) {
                     href={`/requests/${r.id}`}
                     className="flex items-center justify-between gap-3 py-2 hover:bg-accent/40 -mx-2 px-2 rounded-md"
                   >
-                    <div className="flex flex-col gap-0.5 min-w-0">
-                      <div className="text-sm font-medium truncate">
-                        {r.school_name ?? "(학교 미정)"} · {r.subject ?? "과목 미정"}
+                    <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                      <div className="text-xs text-muted-foreground tabular-nums">
+                        {fmtTimeRange(r.start_time, r.end_time)}
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        {fmtTimeRange(r.start_time, r.end_time)} ·{" "}
+                      <div className="text-sm font-medium truncate">
+                        {r.school_name ?? "(학교 미정)"}
+                      </div>
+                      <div className="text-xs text-muted-foreground truncate">
+                        {r.subject ?? "과목 미정"} ·{" "}
                         {r.instructor?.name ?? "본인 직접"}
-                        {r.client?.name ? ` · ${r.client.name}` : ""}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="text-sm tabular-nums">
-                        {fmtKRW(r.fee_total)}
-                      </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
                       <StatusBadge status={r.status} />
+                      {Number(r.fee_total) > 0 && (
+                        <div className="text-xs tabular-nums text-muted-foreground">
+                          {fmtKRW(r.fee_total)}
+                        </div>
+                      )}
                     </div>
                   </Link>
                 </li>

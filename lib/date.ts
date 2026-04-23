@@ -58,3 +58,24 @@ export function addMonth(ym: string, delta: number): string {
   const d = new Date(Date.UTC(y, m - 1 + delta, 1));
   return formatInTimeZone(d, KST, "yyyy-MM");
 }
+
+const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
+
+// "4/24 (금) 11:45" style compact label for lists
+export function fmtCompactWhen(
+  dateStr: string | null | undefined,
+  startTime: string | null | undefined,
+): string {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(`${dateStr}T00:00:00+09:00`);
+    const m = d.getUTCMonth() + 1;
+    const dd = d.getUTCDate();
+    // local KST weekday
+    const wk = WEEKDAY_KO[new Date(`${dateStr}T12:00:00+09:00`).getUTCDay()];
+    const t = startTime ? ` ${startTime.slice(0, 5)}` : "";
+    return `${m}/${dd} (${wk})${t}`;
+  } catch {
+    return dateStr;
+  }
+}
