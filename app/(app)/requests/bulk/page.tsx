@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { requireUser } from "@/lib/supabase/server";
-import { RequestForm } from "@/components/request-form";
+import { BulkImport } from "@/components/bulk-import";
 import { Button } from "@/components/ui/button";
 import type { ClientRow, InstructorRow } from "@/types/database";
 
 export const dynamic = "force-dynamic";
 
-export default async function NewRequestPage() {
+export default async function BulkImportPage() {
   const { supabase, user } = await requireUser();
   const [clientsRes, instructorsRes] = await Promise.all([
     supabase
@@ -37,18 +37,17 @@ export default async function NewRequestPage() {
             <ArrowLeft className="h-4 w-4" /> 목록
           </Link>
         </Button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-semibold tracking-tight">의뢰 등록</h1>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            여러 수업 한번에 등록
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            카카오톡 원문을 붙여넣고 "AI로 자동 채우기"를 눌러 보세요.
+            월별 일정표를 통째로 붙여넣으면 AI가 건별로 나눠 추출합니다. 확인 후 선택 저장.
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <Link href="/requests/bulk">여러 수업 한번에 →</Link>
-        </Button>
       </div>
 
-      <RequestForm mode="new" clients={clients} instructors={instructors} />
+      <BulkImport clients={clients} instructors={instructors} />
     </div>
   );
 }

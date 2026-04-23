@@ -45,10 +45,15 @@ export function AppSidebar({ email }: { email: string | null }) {
         </div>
       </div>
 
-      <div className="p-3">
+      <div className="p-3 flex flex-col gap-2">
         <Button asChild className="w-full" size="sm">
           <Link href="/requests/new">
             <Plus className="h-4 w-4" /> 의뢰 등록
+          </Link>
+        </Button>
+        <Button asChild className="w-full" size="sm" variant="outline">
+          <Link href="/requests/bulk">
+            여러 수업 한번에
           </Link>
         </Button>
       </div>

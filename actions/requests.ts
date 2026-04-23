@@ -70,6 +70,28 @@ export async function updateRequest(id: string, values: RequestFormValues) {
   revalidatePath("/income");
 }
 
+export async function createRequestsBulk(
+  rows: RequestFormValues[],
+  rawMessage: string | null,
+): Promise<{ inserted: number }> {
+  const { supabase, user } = await requireUser();
+  const normalized = rows.map((v) => {
+    const row = normalize(v, user.id);
+    return { ...row, raw_message: row.raw_message ?? rawMessage };
+  });
+  if (normalized.length === 0) {
+    throw new Error("저장할 수업이 없습니다.");
+  }
+  const { error, count } = await supabase
+    .from("class_requests")
+    .insert(normalized, { count: "exact" });
+  if (error) throw new Error(error.message);
+  revalidatePath("/requests");
+  revalidatePath("/");
+  revalidatePath("/income");
+  return { inserted: count ?? normalized.length };
+}
+
 export async function deleteRequest(id: string) {
   const { supabase, user } = await requireUser();
   const { error } = await supabase
