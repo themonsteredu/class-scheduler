@@ -36,16 +36,14 @@ export default async function InstructorsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">강사</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            총 {rows.length}명
-          </p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">강사</h1>
+          <p className="text-sm text-muted-foreground mt-1">총 {rows.length}명</p>
         </div>
         <InstructorDialog
           trigger={
-            <Button>
+            <Button size="sm" className="sm:size-default">
               <Plus className="h-4 w-4" /> 강사 추가
             </Button>
           }
@@ -69,9 +67,8 @@ export default async function InstructorsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>이름</TableHead>
-                  <TableHead>연락처</TableHead>
-                  <TableHead>담당 과목</TableHead>
-                  <TableHead className="text-right">기본 강사료</TableHead>
+                  <TableHead className="hidden sm:table-cell">연락처</TableHead>
+                  <TableHead className="hidden md:table-cell">담당 과목</TableHead>
                   <TableHead>상태</TableHead>
                   <TableHead className="text-right">관리</TableHead>
                 </TableRow>
@@ -79,11 +76,16 @@ export default async function InstructorsPage() {
               <TableBody>
                 {rows.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell>
+                      <div className="font-medium">{r.name}</div>
+                      <div className="text-xs text-muted-foreground sm:hidden">
+                        {r.phone ?? ""}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell text-muted-foreground">
                       {r.phone ?? "—"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <div className="flex flex-wrap gap-1">
                         {(r.subjects ?? []).map((s) => (
                           <Badge key={s} variant="secondary">
@@ -94,9 +96,6 @@ export default async function InstructorsPage() {
                           <span className="text-muted-foreground">—</span>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {r.default_payout ? fmtKRW(r.default_payout) : "—"}
                     </TableCell>
                     <TableCell>
                       {r.active ? (

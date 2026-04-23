@@ -33,14 +33,14 @@ export default async function ClientsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">업체</h1>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">업체</h1>
           <p className="text-sm text-muted-foreground mt-1">총 {rows.length}곳</p>
         </div>
         <ClientDialog
           trigger={
-            <Button>
+            <Button size="sm" className="sm:size-default">
               <Plus className="h-4 w-4" /> 업체 추가
             </Button>
           }
@@ -62,29 +62,28 @@ export default async function ClientsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>업체명</TableHead>
-                  <TableHead>담당자</TableHead>
-                  <TableHead>연락처</TableHead>
-                  <TableHead className="text-right">기본 수수료율</TableHead>
-                  <TableHead>메모</TableHead>
+                  <TableHead className="hidden sm:table-cell">담당자</TableHead>
+                  <TableHead className="hidden md:table-cell">연락처</TableHead>
+                  <TableHead className="hidden lg:table-cell">메모</TableHead>
                   <TableHead className="text-right">관리</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell>
+                      <div className="font-medium">{r.name}</div>
+                      <div className="text-xs text-muted-foreground sm:hidden">
+                        {[r.contact_person, r.phone].filter(Boolean).join(" · ")}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell text-muted-foreground">
                       {r.contact_person ?? "—"}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="hidden md:table-cell text-muted-foreground">
                       {r.phone ?? "—"}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {r.default_commission_rate != null
-                        ? `${r.default_commission_rate}%`
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground max-w-[240px] truncate">
+                    <TableCell className="hidden lg:table-cell text-muted-foreground max-w-[240px] truncate">
                       {r.memo ?? "—"}
                     </TableCell>
                     <TableCell className="text-right">

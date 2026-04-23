@@ -94,14 +94,14 @@ export default async function RequestsPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">의뢰 목록</h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">의뢰 목록</h1>
           <p className="text-sm text-muted-foreground mt-1">
             총 {rows.length}건 · 내 수입 합계 {fmtKRW(totalFee)}
           </p>
         </div>
-        <Button asChild>
+        <Button asChild size="sm" className="sm:size-default">
           <Link href="/requests/new">
             <Plus className="h-4 w-4" /> 의뢰 등록
           </Link>
@@ -134,9 +134,9 @@ export default async function RequestsPage({
                 <TableRow>
                   <TableHead>날짜/시간</TableHead>
                   <TableHead>학교·과목</TableHead>
-                  <TableHead>학년·인원</TableHead>
-                  <TableHead>강사</TableHead>
-                  <TableHead>업체</TableHead>
+                  <TableHead className="hidden md:table-cell">학년·인원</TableHead>
+                  <TableHead className="hidden sm:table-cell">강사</TableHead>
+                  <TableHead className="hidden lg:table-cell">업체</TableHead>
                   <TableHead className="text-right">내 수입</TableHead>
                   <TableHead>상태</TableHead>
                 </TableRow>
@@ -167,25 +167,29 @@ export default async function RequestsPage({
                         <div className="text-xs text-muted-foreground">
                           {r.subject ?? "—"}
                         </div>
+                        <div className="text-xs text-muted-foreground sm:hidden">
+                          {r.instructor?.name ?? "본인 직접"}
+                          {r.client?.name ? ` · ${r.client.name}` : ""}
+                        </div>
                       </Link>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <Link href={`/requests/${r.id}`} className="block">
                         {r.grade ?? "—"}
                         {r.student_count != null ? ` · ${r.student_count}명` : ""}
                       </Link>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <Link href={`/requests/${r.id}`} className="block">
                         {r.instructor?.name ?? "본인 직접"}
                       </Link>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       <Link href={`/requests/${r.id}`} className="block">
                         {r.client?.name ?? "—"}
                       </Link>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
+                    <TableCell className="text-right tabular-nums whitespace-nowrap">
                       {fmtKRW(r.fee_total)}
                     </TableCell>
                     <TableCell>

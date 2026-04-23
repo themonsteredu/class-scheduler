@@ -92,13 +92,13 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">대시보드</h1>
+        <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">대시보드</h1>
         <p className="text-sm text-muted-foreground mt-1">
           {ym} 기준 · 한국 시간(KST)
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <Kpi title="이번 달 수업" value={`${totalCount}건`} hint="취소 제외" />
         <Kpi
           title="예상 수입"
@@ -201,9 +201,9 @@ export default async function DashboardPage() {
                           <TableHeader>
                             <TableRow>
                               <TableHead>날짜</TableHead>
-                              <TableHead>시간</TableHead>
+                              <TableHead className="hidden sm:table-cell">시간</TableHead>
                               <TableHead>학교·과목</TableHead>
-                              <TableHead>업체</TableHead>
+                              <TableHead className="hidden md:table-cell">업체</TableHead>
                               <TableHead className="text-right">
                                 내 수입
                               </TableHead>
@@ -213,7 +213,7 @@ export default async function DashboardPage() {
                           <TableBody>
                             {g.active.map((r) => (
                               <TableRow key={r.id}>
-                                <TableCell>
+                                <TableCell className="whitespace-nowrap">
                                   <Link
                                     href={`/requests/${r.id}`}
                                     className="block"
@@ -221,7 +221,7 @@ export default async function DashboardPage() {
                                     {r.class_date ?? "—"}
                                   </Link>
                                 </TableCell>
-                                <TableCell className="text-muted-foreground">
+                                <TableCell className="hidden sm:table-cell text-muted-foreground">
                                   {fmtTimeRange(r.start_time, r.end_time)}
                                 </TableCell>
                                 <TableCell>
@@ -233,12 +233,17 @@ export default async function DashboardPage() {
                                       {r.school_name ?? "—"}
                                     </div>
                                     <div className="text-xs text-muted-foreground">
-                                      {r.subject ?? "—"}
+                                      {r.subject ?? "—"} · {fmtTimeRange(r.start_time, r.end_time)}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground md:hidden">
+                                      {r.client?.name ?? ""}
                                     </div>
                                   </Link>
                                 </TableCell>
-                                <TableCell>{r.client?.name ?? "—"}</TableCell>
-                                <TableCell className="text-right tabular-nums">
+                                <TableCell className="hidden md:table-cell">
+                                  {r.client?.name ?? "—"}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums whitespace-nowrap">
                                   {fmtKRW(r.fee_total)}
                                 </TableCell>
                                 <TableCell>
@@ -272,15 +277,19 @@ function Kpi({
 }) {
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm text-muted-foreground font-normal">
+      <CardHeader className="pb-2 p-3 sm:p-6">
+        <CardTitle className="text-xs sm:text-sm text-muted-foreground font-normal">
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-semibold tabular-nums">{value}</div>
+      <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+        <div className="text-base sm:text-2xl font-semibold tabular-nums truncate">
+          {value}
+        </div>
         {hint && (
-          <div className="text-xs text-muted-foreground mt-1">{hint}</div>
+          <div className="text-[10px] sm:text-xs text-muted-foreground mt-1 hidden sm:block">
+            {hint}
+          </div>
         )}
       </CardContent>
     </Card>

@@ -79,7 +79,7 @@ export default async function IncomePage({
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">수입 리포트</h1>
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-tight">수입 리포트</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {ym} · 수업완료·정산완료 상태만 집계
           </p>
@@ -91,7 +91,7 @@ export default async function IncomePage({
         </Suspense>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <Kpi title="내 수입 합계" value={fmtKRW(totalIncome)} />
         <Kpi title="수업 건수" value={`${classCount}건`} />
       </div>
@@ -117,28 +117,34 @@ export default async function IncomePage({
                     <TableRow>
                       <TableHead>날짜</TableHead>
                       <TableHead>학교·과목</TableHead>
-                      <TableHead>강사</TableHead>
-                      <TableHead>업체</TableHead>
+                      <TableHead className="hidden sm:table-cell">강사</TableHead>
+                      <TableHead className="hidden md:table-cell">업체</TableHead>
                       <TableHead className="text-right">내 수입</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {rows.map((r) => (
                       <TableRow key={r.id}>
-                        <TableCell className="tabular-nums">
+                        <TableCell className="tabular-nums whitespace-nowrap">
                           {r.class_date ?? "—"}
                         </TableCell>
                         <TableCell>
-                          {r.school_name ?? "—"} ·{" "}
-                          <span className="text-muted-foreground">
+                          <div>{r.school_name ?? "—"}</div>
+                          <div className="text-xs text-muted-foreground">
                             {r.subject ?? "—"}
-                          </span>
+                          </div>
+                          <div className="text-xs text-muted-foreground sm:hidden">
+                            {r.instructor?.name ?? "본인 직접"}
+                            {r.client?.name ? ` · ${r.client.name}` : ""}
+                          </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="hidden sm:table-cell">
                           {r.instructor?.name ?? "본인 직접"}
                         </TableCell>
-                        <TableCell>{r.client?.name ?? "—"}</TableCell>
-                        <TableCell className="text-right tabular-nums font-medium">
+                        <TableCell className="hidden md:table-cell">
+                          {r.client?.name ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums font-medium whitespace-nowrap">
                           {fmtKRW(r.fee_total)}
                         </TableCell>
                       </TableRow>

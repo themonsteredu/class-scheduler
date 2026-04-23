@@ -90,7 +90,7 @@ export function MonthCalendar({ rows }: Props) {
           <div
             key={d}
             className={cn(
-              "px-2 py-2 text-xs font-medium text-center border-b bg-muted/40",
+              "px-1 py-2 text-[10px] sm:text-xs font-medium text-center border-b bg-muted/40",
               i === 0 && "text-red-600",
               i === 6 && "text-sky-600",
             )}
@@ -111,7 +111,7 @@ export function MonthCalendar({ rows }: Props) {
               onClick={() => date && setSelected(date)}
               disabled={!date}
               className={cn(
-                "min-h-[90px] border-t border-l first:border-l-0 p-1.5 text-left flex flex-col gap-1 transition-colors",
+                "min-h-[52px] sm:min-h-[90px] border-t border-l first:border-l-0 p-1 sm:p-1.5 text-left flex flex-col gap-0.5 sm:gap-1 transition-colors",
                 idx % 7 === 0 && "border-l-0",
                 !date && "bg-muted/10 cursor-default",
                 date && "hover:bg-accent/40",
@@ -121,17 +121,30 @@ export function MonthCalendar({ rows }: Props) {
               {day && (
                 <div
                   className={cn(
-                    "text-xs tabular-nums",
+                    "text-[11px] sm:text-xs tabular-nums self-start",
                     dayOfWeek === 0 && "text-red-600",
                     dayOfWeek === 6 && "text-sky-600",
                     isToday &&
-                      "inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground font-semibold",
+                      "inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-primary text-primary-foreground font-semibold",
                   )}
                 >
                   {day}
                 </div>
               )}
-              <div className="flex flex-col gap-0.5 overflow-hidden">
+              {/* Mobile: simple dot count */}
+              {classes.length > 0 && (
+                <div className="flex sm:hidden items-center gap-0.5 justify-center mt-auto">
+                  {classes.length === 1 ? (
+                    <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                  ) : (
+                    <span className="text-[10px] leading-none rounded-full bg-sky-500 text-white px-1.5 py-0.5 tabular-nums">
+                      {classes.length}
+                    </span>
+                  )}
+                </div>
+              )}
+              {/* Desktop: labels */}
+              <div className="hidden sm:flex flex-col gap-0.5 overflow-hidden">
                 {classes.slice(0, 3).map((c) => (
                   <div
                     key={c.id}
