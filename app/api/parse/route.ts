@@ -8,7 +8,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-haiku-4-5";
-const TIMEOUT_MS = 20_000;
+const TIMEOUT_MS = 30_000;
+const MAX_TOKENS = 1200;
 
 function systemPrompt(today: string) {
   return `당신은 한국의 진로수업 중개 담당자의 비서입니다.
@@ -20,6 +21,7 @@ ${today}
 
 ## 규칙
 - 반드시 아래 JSON 형식 하나만 출력. 다른 텍스트 금지.
+- **여러 수업 일정이 같이 들어와도 반드시 단일 JSON 객체 하나만 반환** (배열 금지). 원문에서 첫 번째 수업을 기준으로 파싱하고, 나머지는 notes에 "외 N건" 형태로만 언급.
 - 확신이 없으면 값은 null, confidence는 'low'.
 - 상대 날짜("다음 주 화요일", "담주 수", "5/12")는 오늘 날짜 기준 YYYY-MM-DD로 변환.
 - 시간은 24시간제 HH:mm. "오후 2시~3시 반" → "14:00","15:30".
@@ -80,13 +82,52 @@ function userPrompt(
 ${message}`;
 }
 
+// Scan candidate for balanced JSON (array or object) and return the first complete one.
 function extractJSON(raw: string): string | null {
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const candidate = (fenced ? fenced[1] : raw).trim();
-  const start = candidate.indexOf("{");
-  const end = candidate.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) return null;
-  return candidate.slice(start, end + 1);
+
+  for (let i = 0; i < candidate.length; i++) {
+    const ch = candidate[i];
+    if (ch !== "{" && ch !== "[") continue;
+    const opener = ch;
+    const closer = opener === "{" ? "}" : "]";
+    let depth = 0;
+    let inStr = false;
+    let escape = false;
+    for (let j = i; j < candidate.length; j++) {
+      const c = candidate[j];
+      if (inStr) {
+        if (escape) {
+          escape = false;
+        } else if (c === "\\") {
+          escape = true;
+        } else if (c === '"') {
+          inStr = false;
+        }
+        continue;
+      }
+      if (c === '"') {
+        inStr = true;
+      } else if (c === opener) {
+        depth++;
+      } else if (c === closer) {
+        depth--;
+        if (depth === 0) {
+          return candidate.slice(i, j + 1);
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// Try to parse and normalize an AI result — if the AI returned an array, take the first item.
+function coerceToObject(parsed: unknown): unknown {
+  if (Array.isArray(parsed)) {
+    return parsed.length > 0 ? parsed[0] : {};
+  }
+  return parsed;
 }
 
 async function callClaude(
@@ -98,7 +139,7 @@ async function callClaude(
   const response = await client.messages.create(
     {
       model: MODEL,
-      max_tokens: 800,
+      max_tokens: MAX_TOKENS,
       temperature,
       system,
       messages: [{ role: "user", content: userText }],
@@ -184,7 +225,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const validated = parseResultSchema.safeParse(parsedObj);
+    const validated = parseResultSchema.safeParse(coerceToObject(parsedObj));
     if (!validated.success) {
       return NextResponse.json(
         {
