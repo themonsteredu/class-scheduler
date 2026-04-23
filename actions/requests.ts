@@ -10,7 +10,14 @@ import {
 } from "@/lib/schemas";
 
 function normalize(values: RequestFormValues, userId: string) {
-  const parsed = requestFormSchema.parse(values);
+  const result = requestFormSchema.safeParse(values);
+  if (!result.success) {
+    const msg = result.error.issues
+      .map((i) => `${i.path.join(".") || "값"}: ${i.message}`)
+      .join(" / ");
+    throw new Error(`입력 오류 — ${msg}`);
+  }
+  const parsed = result.data;
   return {
     user_id: userId,
     client_id: parsed.client_id || null,
@@ -25,7 +32,7 @@ function normalize(values: RequestFormValues, userId: string) {
     fee_total: parsed.fee_total ?? 0,
     instructor_payout: parsed.instructor_payout ?? 0,
     extra_fees: parsed.extra_fees ?? [],
-    status: parsed.status,
+    status: parsed.status ?? "의뢰접수",
     raw_message: parsed.raw_message ?? null,
     memo: parsed.memo ?? null,
   };

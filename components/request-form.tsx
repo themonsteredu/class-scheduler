@@ -299,7 +299,7 @@ export function RequestForm({ mode, request, clients, instructors }: Props) {
             name="status"
             render={({ field }) => (
               <Select
-                value={field.value}
+                value={field.value ?? "의뢰접수"}
                 onValueChange={(v) => field.onChange(v as RequestStatus)}
               >
                 <SelectTrigger>

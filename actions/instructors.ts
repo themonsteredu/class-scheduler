@@ -13,7 +13,14 @@ function normalizeSubjects(value: string | undefined | null): string[] {
 }
 
 export async function createInstructor(values: InstructorFormValues) {
-  const parsed = instructorFormSchema.parse(values);
+  const result = instructorFormSchema.safeParse(values);
+  if (!result.success) {
+    const msg = result.error.issues
+      .map((i) => `${i.path.join(".") || "값"}: ${i.message}`)
+      .join(" / ");
+    throw new Error(`입력 오류 — ${msg}`);
+  }
+  const parsed = result.data;
   const { supabase, user } = await requireUser();
   const { error } = await supabase.from("instructors").insert({
     user_id: user.id,
@@ -31,7 +38,14 @@ export async function createInstructor(values: InstructorFormValues) {
 }
 
 export async function updateInstructor(id: string, values: InstructorFormValues) {
-  const parsed = instructorFormSchema.parse(values);
+  const result = instructorFormSchema.safeParse(values);
+  if (!result.success) {
+    const msg = result.error.issues
+      .map((i) => `${i.path.join(".") || "값"}: ${i.message}`)
+      .join(" / ");
+    throw new Error(`입력 오류 — ${msg}`);
+  }
+  const parsed = result.data;
   const { supabase, user } = await requireUser();
   const { error } = await supabase
     .from("instructors")

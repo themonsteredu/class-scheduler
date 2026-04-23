@@ -4,8 +4,19 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/server";
 import { clientFormSchema, type ClientFormValues } from "@/lib/schemas";
 
+function validate(values: ClientFormValues) {
+  const result = clientFormSchema.safeParse(values);
+  if (!result.success) {
+    const msg = result.error.issues
+      .map((i) => `${i.path.join(".") || "값"}: ${i.message}`)
+      .join(" / ");
+    throw new Error(`입력 오류 — ${msg}`);
+  }
+  return result.data;
+}
+
 export async function createClient(values: ClientFormValues) {
-  const parsed = clientFormSchema.parse(values);
+  const parsed = validate(values);
   const { supabase, user } = await requireUser();
   const { error } = await supabase.from("clients").insert({
     user_id: user.id,
@@ -20,7 +31,7 @@ export async function createClient(values: ClientFormValues) {
 }
 
 export async function updateClient(id: string, values: ClientFormValues) {
-  const parsed = clientFormSchema.parse(values);
+  const parsed = validate(values);
   const { supabase, user } = await requireUser();
   const { error } = await supabase
     .from("clients")
