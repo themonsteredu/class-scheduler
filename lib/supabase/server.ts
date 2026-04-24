@@ -29,9 +29,11 @@ export async function createClient() {
 
 export async function requireUser() {
   const supabase = await createClient();
+  // Session is verified in middleware. Here we just read the cookie (no network call)
+  // to avoid duplicate auth latency on every page render.
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-  return { supabase, user };
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.user) redirect("/login");
+  return { supabase, user: session.user };
 }

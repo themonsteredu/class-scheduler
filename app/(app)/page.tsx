@@ -5,6 +5,7 @@ import {
   thisMonthKST,
   todayISO,
   fmtCompactWhen,
+  addMonth,
 } from "@/lib/date";
 import { fmtKRW } from "@/lib/money";
 import {
@@ -25,11 +26,17 @@ export default async function DashboardPage() {
   const ym = thisMonthKST();
   const { start, end } = monthRange(ym);
 
-  // Current + previous + next month (for calendar navigation range)
+  // Load -3 / +6 months around current month for calendar + lists
+  // (Keeps query fast; calendar can still navigate but will show empty past months)
+  const { start: rangeStart } = monthRange(addMonth(ym, -3));
+  const { end: rangeEnd } = monthRange(addMonth(ym, 6));
+
   const { data: monthRows } = await supabase
     .from("class_requests")
     .select("*, client:clients(id,name), instructor:instructors(id,name)")
     .eq("user_id", user.id)
+    .gte("class_date", rangeStart)
+    .lt("class_date", rangeEnd)
     .order("class_date", { ascending: true });
 
   const allRows = (monthRows ?? []) as unknown as ClassRequestRow[];
