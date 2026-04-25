@@ -255,15 +255,19 @@ function Kpi({
 }) {
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm text-muted-foreground font-normal">
+      <CardHeader className="pb-2 p-3 sm:p-6">
+        <CardTitle className="text-xs sm:text-sm text-muted-foreground font-normal">
           {title}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-semibold tabular-nums">{value}</div>
+      <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+        <div className="text-base sm:text-2xl font-semibold tabular-nums break-all leading-tight">
+          {value}
+        </div>
         {hint && (
-          <div className="text-xs text-muted-foreground mt-1">{hint}</div>
+          <div className="text-[10px] sm:text-xs text-muted-foreground mt-1 hidden sm:block">
+            {hint}
+          </div>
         )}
       </CardContent>
     </Card>

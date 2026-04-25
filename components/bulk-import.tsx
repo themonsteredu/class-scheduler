@@ -427,9 +427,10 @@ export function BulkImport({ clients, instructors }: Props) {
               </div>
             )}
 
-            <div className="flex items-center justify-between gap-3 pt-2 border-t">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t">
               <div className="text-sm text-muted-foreground">
-                선택 {selectedCount}건 · 내 수입 합계 {fmtKRW(totalFee)}
+                선택 {selectedCount}건 · 내 수입 합계{" "}
+                <span className="tabular-nums">{fmtKRW(totalFee)}</span>
               </div>
               <div className="flex gap-2">
                 <Button
@@ -437,10 +438,15 @@ export function BulkImport({ clients, instructors }: Props) {
                   variant="outline"
                   onClick={() => setRows([])}
                   disabled={saving}
+                  className="flex-1 sm:flex-none"
                 >
                   초기화
                 </Button>
-                <Button onClick={onSave} disabled={saving || selectedCount === 0}>
+                <Button
+                  onClick={onSave}
+                  disabled={saving || selectedCount === 0}
+                  className="flex-1 sm:flex-none"
+                >
                   {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                   {selectedCount}건 저장
                 </Button>

@@ -261,7 +261,7 @@ function Kpi({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
-        <div className="text-base sm:text-2xl font-semibold tabular-nums truncate">
+        <div className="text-sm sm:text-2xl font-semibold tabular-nums break-all leading-tight">
           {value}
         </div>
         {hint && (
