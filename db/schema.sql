@@ -333,3 +333,94 @@ create trigger equipment_loans_set_updated_at before update on public.equipment_
 drop trigger if exists equipment_components_set_updated_at on public.equipment_components;
 create trigger equipment_components_set_updated_at before update on public.equipment_components
   for each row execute function public.set_updated_at();
+
+-- ============================================================
+-- 역할 / 강사 로그인 (profiles) — 자세한 내용: db/migrations/0006
+-- ============================================================
+create table if not exists public.profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  role text not null default 'pending',
+  instructor_id uuid references public.instructors(id) on delete set null,
+  owner_id uuid references auth.users(id) on delete set null,
+  email text,
+  display_name text,
+  phone text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists profiles_owner_id_idx on public.profiles(owner_id);
+create index if not exists profiles_role_idx on public.profiles(role);
+alter table public.profiles enable row level security;
+
+create or replace function public.user_role() returns text
+  language sql security definer stable set search_path = public as $$
+  select role from public.profiles where id = auth.uid();
+$$;
+create or replace function public.current_instructor_id() returns uuid
+  language sql security definer stable set search_path = public as $$
+  select instructor_id from public.profiles where id = auth.uid() and role = 'instructor';
+$$;
+create or replace function public.user_owner() returns uuid
+  language sql security definer stable set search_path = public as $$
+  select owner_id from public.profiles where id = auth.uid();
+$$;
+
+drop policy if exists "profiles_self_select" on public.profiles;
+create policy "profiles_self_select" on public.profiles for select using (auth.uid() = id);
+drop policy if exists "profiles_admin_select" on public.profiles;
+create policy "profiles_admin_select" on public.profiles for select using (public.user_role() = 'admin');
+drop policy if exists "profiles_admin_update" on public.profiles;
+create policy "profiles_admin_update" on public.profiles for update
+  using (public.user_role() = 'admin') with check (public.user_role() = 'admin');
+
+create or replace function public.handle_new_user() returns trigger
+  language plpgsql security definer set search_path = public as $$
+declare admin_id uuid;
+begin
+  select id into admin_id from public.profiles where role = 'admin' order by created_at limit 1;
+  insert into public.profiles (id, role, owner_id, email, display_name)
+  values (new.id, 'pending', admin_id, new.email,
+          coalesce(new.raw_user_meta_data->>'display_name', new.email))
+  on conflict (id) do nothing;
+  return new;
+end $$;
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+drop trigger if exists profiles_set_updated_at on public.profiles;
+create trigger profiles_set_updated_at before update on public.profiles
+  for each row execute function public.set_updated_at();
+
+-- 강사용 접근 권한 (관리자 정책과 OR)
+drop policy if exists "class_requests_instructor_select" on public.class_requests;
+create policy "class_requests_instructor_select" on public.class_requests
+  for select using (instructor_id = public.current_instructor_id());
+drop policy if exists "instructors_instructor_self" on public.instructors;
+create policy "instructors_instructor_self" on public.instructors
+  for select using (id = public.current_instructor_id());
+drop policy if exists "equipment_instructor_select" on public.equipment;
+create policy "equipment_instructor_select" on public.equipment
+  for select using (user_id = public.user_owner());
+drop policy if exists "equipment_components_instructor_select" on public.equipment_components;
+create policy "equipment_components_instructor_select" on public.equipment_components
+  for select using (user_id = public.user_owner());
+drop policy if exists "program_equipment_instructor_select" on public.program_equipment;
+create policy "program_equipment_instructor_select" on public.program_equipment
+  for select using (user_id = public.user_owner());
+drop policy if exists "equipment_loans_instructor_select" on public.equipment_loans;
+create policy "equipment_loans_instructor_select" on public.equipment_loans
+  for select using (instructor_id = public.current_instructor_id());
+drop policy if exists "equipment_loans_instructor_update" on public.equipment_loans;
+create policy "equipment_loans_instructor_update" on public.equipment_loans
+  for update using (instructor_id = public.current_instructor_id())
+  with check (instructor_id = public.current_instructor_id());
+drop policy if exists "shortages_instructor_select" on public.equipment_loan_shortages;
+create policy "shortages_instructor_select" on public.equipment_loan_shortages
+  for select using (exists (select 1 from public.equipment_loans l
+    where l.id = loan_id and l.instructor_id = public.current_instructor_id()));
+drop policy if exists "shortages_instructor_insert" on public.equipment_loan_shortages;
+create policy "shortages_instructor_insert" on public.equipment_loan_shortages
+  for insert with check (user_id = public.user_owner()
+    and exists (select 1 from public.equipment_loans l
+      where l.id = loan_id and l.instructor_id = public.current_instructor_id()));

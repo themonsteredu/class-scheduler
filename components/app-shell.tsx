@@ -11,6 +11,7 @@ import {
   Building2,
   BarChart3,
   Package,
+  UserCheck,
   LogOut,
   Plus,
   Menu,
@@ -33,6 +34,7 @@ const NAV = [
   { href: "/instructors", label: "강사", icon: Users },
   { href: "/clients", label: "업체", icon: Building2 },
   { href: "/equipment", label: "교구", icon: Package },
+  { href: "/team", label: "강사 계정", icon: UserCheck },
   { href: "/income", label: "수입 리포트", icon: BarChart3 },
 ];
 
