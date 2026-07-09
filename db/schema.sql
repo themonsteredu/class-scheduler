@@ -264,6 +264,26 @@ drop policy if exists "push_subscriptions_owner_all" on public.push_subscription
 create policy "push_subscriptions_owner_all" on public.push_subscriptions
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- Program → equipment mapping (프로그램(과목) 이름마다 필요한 교구 고정)
+create table if not exists public.program_equipment (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  program_name text not null,
+  equipment_id uuid not null references public.equipment(id) on delete cascade,
+  quantity int not null default 1,
+  created_at timestamptz not null default now(),
+  unique (user_id, program_name, equipment_id)
+);
+
+create index if not exists program_equipment_user_id_idx on public.program_equipment(user_id);
+create index if not exists program_equipment_equipment_id_idx on public.program_equipment(equipment_id);
+
+alter table public.program_equipment enable row level security;
+
+drop policy if exists "program_equipment_owner_all" on public.program_equipment;
+create policy "program_equipment_owner_all" on public.program_equipment
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 -- updated_at trigger helper
 create or replace function public.set_updated_at() returns trigger as $$
 begin new.updated_at = now(); return new; end $$ language plpgsql;

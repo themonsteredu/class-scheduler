@@ -61,6 +61,34 @@ export function addMonth(ym: string, delta: number): string {
 
 const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"];
 
+// KST weekday index (0=Sun..6=Sat) for a yyyy-MM-dd string.
+export function weekdayIndexKST(iso: string): number {
+  return new Date(`${iso}T12:00:00+09:00`).getUTCDay();
+}
+
+export function weekdayKO(iso: string): string {
+  return WEEKDAY_KO[weekdayIndexKST(iso)];
+}
+
+// Add n days to a yyyy-MM-dd string (KST-safe), returns yyyy-MM-dd.
+export function addDaysISO(iso: string, n: number): string {
+  const d = new Date(`${iso}T12:00:00+09:00`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return formatInTimeZone(d, KST, "yyyy-MM-dd");
+}
+
+// Monday-based start of the week containing the given date.
+export function weekStartISO(iso: string): string {
+  const day = weekdayIndexKST(iso); // 0=Sun..6=Sat
+  const offset = day === 0 ? -6 : -(day - 1);
+  return addDaysISO(iso, offset);
+}
+
+// The 7 yyyy-MM-dd dates (월~일) of the week starting at monday.
+export function weekDaysISO(mondayISO: string): string[] {
+  return Array.from({ length: 7 }, (_, i) => addDaysISO(mondayISO, i));
+}
+
 // "4/24 (금) 11:45" style compact label for lists
 export function fmtCompactWhen(
   dateStr: string | null | undefined,

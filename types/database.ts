@@ -130,6 +130,16 @@ export interface EquipmentLoanRow {
   instructor?: { id: UUID; name: string } | null;
 }
 
+export interface ProgramEquipmentRow {
+  id: UUID;
+  user_id: UUID;
+  program_name: string;
+  equipment_id: UUID;
+  quantity: number;
+  created_at: string;
+  equipment?: { id: UUID; name: string; total_quantity: number } | null;
+}
+
 export interface PushSubscriptionRow {
   id: UUID;
   user_id: UUID;
