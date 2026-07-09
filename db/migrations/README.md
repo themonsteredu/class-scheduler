@@ -10,6 +10,7 @@ Supabase 대시보드 → **SQL Editor**에서 아래 순서대로 한 번씩 �
 | 3 | `0003_push_subscriptions.sql` | 웹 푸시 알림 구독(`push_subscriptions`), RLS |
 | 4 | `0004_program_equipment.sql` | 프로그램(과목)별 교구 매핑(`program_equipment`), RLS |
 | 5 | `0005_sessions_region_material.sql` | 수업 차시·지역 컬럼 + 프로그램별 재료비 규칙(`program_material_fees`), RLS |
+| 6 | `0006_profiles_roles.sql` | 강사 로그인 역할(`profiles`), 강사 접근 권한(RLS), 신규가입 트리거. **강사 가입 전 먼저 실행** |
 
 ## 실행 방법
 1. Supabase 프로젝트 → 왼쪽 메뉴 **SQL Editor** → **New query**

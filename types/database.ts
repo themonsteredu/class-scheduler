@@ -7,6 +7,20 @@ import type {
 
 export type UUID = string;
 
+export type UserRole = "admin" | "instructor" | "pending";
+
+export interface ProfileRow {
+  id: UUID;
+  role: UserRole;
+  instructor_id: UUID | null;
+  owner_id: UUID | null;
+  email: string | null;
+  display_name: string | null;
+  phone: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface InstructorRow {
   id: UUID;
   user_id: UUID;
