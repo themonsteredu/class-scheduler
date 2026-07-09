@@ -22,6 +22,7 @@ import { EquipmentDialog } from "@/components/equipment-dialog";
 import { EquipmentRowActions } from "@/components/equipment-row-actions";
 import { EquipmentPushToggle } from "@/components/equipment-push-toggle";
 import { EquipmentComponentsDialog } from "@/components/equipment-components-dialog";
+import { EquipmentHistoryDialog } from "@/components/equipment-history-dialog";
 import { LoanDialog } from "@/components/loan-dialog";
 import { LoanRowActions } from "@/components/loan-row-actions";
 import { fmtDate, todayISO } from "@/lib/date";
@@ -96,6 +97,13 @@ export default async function EquipmentPage() {
     const arr = shortagesByLoan.get(s.loan_id) ?? [];
     arr.push(s);
     shortagesByLoan.set(s.loan_id, arr);
+  }
+  // All loans per equipment — for the "이동 내역(루트)" timeline.
+  const loansByEquipment = new Map<string, EquipmentLoanRow[]>();
+  for (const l of loans) {
+    const arr = loansByEquipment.get(l.equipment_id) ?? [];
+    arr.push(l);
+    loansByEquipment.set(l.equipment_id, arr);
   }
 
   // How many of each equipment are currently checked out.
@@ -241,6 +249,15 @@ export default async function EquipmentPage() {
                             {s.equipment.category ?? ""}
                             {s.equipment.category ? " · " : ""}총 {s.equipment.total_quantity}
                           </div>
+                          <EquipmentHistoryDialog
+                            equipment={{ id: s.equipment.id, name: s.equipment.name }}
+                            loans={loansByEquipment.get(s.equipment.id) ?? []}
+                            trigger={
+                              <button className="text-xs text-primary hover:underline mt-0.5">
+                                이동 내역 보기
+                              </button>
+                            }
+                          />
                         </TableCell>
                         <TableCell className="text-right tabular-nums font-medium">
                           {s.available}
