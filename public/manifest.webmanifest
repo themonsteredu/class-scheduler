@@ -1,0 +1,17 @@
+{
+  "name": "수업 스케줄러",
+  "short_name": "스케줄러",
+  "description": "진로수업 강사 파견 중개 관리",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

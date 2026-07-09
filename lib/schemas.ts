@@ -45,6 +45,62 @@ export const instructorFormSchema = z.object({
 });
 export type InstructorFormValues = z.input<typeof instructorFormSchema>;
 
+export const LOAN_STATUS_VALUES = ["대여중", "반납완료"] as const;
+export type LoanStatus = (typeof LOAN_STATUS_VALUES)[number];
+
+const requiredNumber = (min: number, fallback: number) =>
+  z.preprocess(
+    (v) => (v === "" || v == null ? fallback : Number(v)),
+    z.number().min(min),
+  );
+
+export const equipmentFormSchema = z.object({
+  name: z.string().min(1, "교구명 필수"),
+  category: optionalString,
+  total_quantity: requiredNumber(0, 1),
+  low_stock_threshold: requiredNumber(0, 0),
+  memo: optionalString,
+  active: z.boolean().nullish().transform((v) => v ?? true),
+});
+export type EquipmentFormValues = z.input<typeof equipmentFormSchema>;
+
+export const loanFormSchema = z.object({
+  equipment_id: z.string().min(1, "교구 선택 필수"),
+  instructor_id: z.string().nullish(),
+  quantity: requiredNumber(1, 1),
+  checked_out_on: optionalString,
+  due_on: optionalString,
+  memo: optionalString,
+});
+export type LoanFormValues = z.input<typeof loanFormSchema>;
+
+export const componentFormSchema = z.object({
+  name: z.string().min(1, "구성품명 필수"),
+  unit: optionalString,
+  total_quantity: requiredNumber(0, 0),
+  low_stock_threshold: requiredNumber(0, 0),
+});
+export type ComponentFormValues = z.input<typeof componentFormSchema>;
+
+export const loanShortageInputSchema = z.object({
+  component_id: z.string().min(1),
+  component_name: optionalString,
+  shortage_qty: requiredNumber(0, 0),
+  note: optionalString,
+});
+export type LoanShortageInput = z.input<typeof loanShortageInputSchema>;
+
+export const loanReturnSchema = z.object({
+  returned_on: optionalString,
+  lost_damaged_qty: requiredNumber(0, 0),
+  condition_memo: optionalString,
+  shortages: z
+    .array(loanShortageInputSchema)
+    .nullish()
+    .transform((v) => v ?? []),
+});
+export type LoanReturnValues = z.input<typeof loanReturnSchema>;
+
 export const clientFormSchema = z.object({
   name: z.string().min(1, "업체명 필수"),
   contact_person: optionalString,
