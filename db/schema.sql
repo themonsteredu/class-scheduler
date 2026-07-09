@@ -57,6 +57,8 @@ create table if not exists public.class_requests (
   subject text,
   grade text,
   student_count int,
+  sessions int not null default 1,
+  region text,
   fee_total numeric(12,0) default 0,
   instructor_payout numeric(12,0) default 0,
   my_commission numeric(12,0) generated always as (coalesce(fee_total,0) - coalesce(instructor_payout,0)) stored,
@@ -262,6 +264,26 @@ alter table public.push_subscriptions enable row level security;
 
 drop policy if exists "push_subscriptions_owner_all" on public.push_subscriptions;
 create policy "push_subscriptions_owner_all" on public.push_subscriptions
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Program material fees (프로그램(과목)별 재료비 규칙 → 내 수입)
+-- fee_type: 'fixed'(수업당 고정) | 'per_person'(인당)
+create table if not exists public.program_material_fees (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  program_name text not null,
+  fee_type text not null default 'fixed',
+  amount numeric(12,0) not null default 0,
+  created_at timestamptz not null default now(),
+  unique (user_id, program_name)
+);
+
+create index if not exists program_material_fees_user_id_idx on public.program_material_fees(user_id);
+
+alter table public.program_material_fees enable row level security;
+
+drop policy if exists "program_material_fees_owner_all" on public.program_material_fees;
+create policy "program_material_fees_owner_all" on public.program_material_fees
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- Program → equipment mapping (프로그램(과목) 이름마다 필요한 교구 고정)

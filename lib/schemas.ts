@@ -120,6 +120,8 @@ export const requestFormSchema = z.object({
   subject: optionalString,
   grade: optionalString,
   student_count: optionalNumber,
+  sessions: optionalNumber,
+  region: optionalString,
   fee_total: optionalNumber,
   instructor_payout: optionalNumber,
   extra_fees: z

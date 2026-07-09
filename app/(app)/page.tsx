@@ -8,7 +8,7 @@ import {
   fmtDate,
   addMonth,
 } from "@/lib/date";
-import { fmtKRW } from "@/lib/money";
+import { fmtKRW, sumExtras } from "@/lib/money";
 import {
   Card,
   CardContent,
@@ -97,13 +97,14 @@ export default async function DashboardPage() {
       r.status !== "취소",
   );
   const totalCount = currentMonthRows.length;
+  // 내 수입 = 재료비(부가항목 중 내 수입). 강사료는 업체가 강사에게 직접 지급.
   const expectedIncome = currentMonthRows.reduce(
-    (acc, r) => acc + Number(r.fee_total ?? 0),
+    (acc, r) => acc + sumExtras(r.extra_fees, "me"),
     0,
   );
   const confirmedIncome = currentMonthRows
     .filter((r) => r.status === "수업완료" || r.status === "정산완료")
-    .reduce((acc, r) => acc + Number(r.fee_total ?? 0), 0);
+    .reduce((acc, r) => acc + sumExtras(r.extra_fees, "me"), 0);
 
   const today = todayISO();
   const upcoming = allRows
@@ -150,12 +151,12 @@ export default async function DashboardPage() {
         <Kpi
           title="예상 수입"
           value={fmtKRW(expectedIncome)}
-          hint="모든 상태 합계"
+          hint="재료비 기준·모든 상태"
         />
         <Kpi
           title="확정 수입"
           value={fmtKRW(confirmedIncome)}
-          hint="수업완료·정산완료"
+          hint="재료비·수업완료·정산완료"
         />
       </div>
 

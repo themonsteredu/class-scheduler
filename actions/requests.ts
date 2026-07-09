@@ -29,6 +29,8 @@ function normalize(values: RequestFormValues, userId: string) {
     subject: parsed.subject ?? null,
     grade: parsed.grade ?? null,
     student_count: parsed.student_count ?? null,
+    sessions: parsed.sessions ?? 1,
+    region: parsed.region ?? null,
     fee_total: parsed.fee_total ?? 0,
     instructor_payout: parsed.instructor_payout ?? 0,
     extra_fees: parsed.extra_fees ?? [],

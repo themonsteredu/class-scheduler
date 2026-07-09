@@ -182,6 +182,8 @@ export function BulkImport({ clients, instructors }: Props) {
           subject: r.subject || null,
           grade: r.grade || null,
           student_count: r.student_count === "" ? null : Number(r.student_count),
+          sessions: 1,
+          region: null,
           fee_total: r.fee_total === "" ? null : Number(r.fee_total),
           instructor_payout: 0,
           extra_fees: [],

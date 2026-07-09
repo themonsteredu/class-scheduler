@@ -46,6 +46,8 @@ export interface ClassRequestRow {
   subject: string | null;
   grade: string | null;
   student_count: number | null;
+  sessions: number | null;
+  region: string | null;
   fee_total: number | null;
   instructor_payout: number | null;
   my_commission: number | null;
@@ -128,6 +130,15 @@ export interface EquipmentLoanRow {
   updated_at: string;
   equipment?: { id: UUID; name: string } | null;
   instructor?: { id: UUID; name: string } | null;
+}
+
+export interface ProgramMaterialFeeRow {
+  id: UUID;
+  user_id: UUID;
+  program_name: string;
+  fee_type: "fixed" | "per_person";
+  amount: number;
+  created_at: string;
 }
 
 export interface ProgramEquipmentRow {
