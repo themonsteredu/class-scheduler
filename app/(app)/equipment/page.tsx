@@ -20,6 +20,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EquipmentDialog } from "@/components/equipment-dialog";
 import { EquipmentRowActions } from "@/components/equipment-row-actions";
+import { EquipmentPushToggle } from "@/components/equipment-push-toggle";
 import { EquipmentComponentsDialog } from "@/components/equipment-components-dialog";
 import { LoanDialog } from "@/components/loan-dialog";
 import { LoanRowActions } from "@/components/loan-row-actions";
@@ -147,6 +148,7 @@ export default async function EquipmentPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <EquipmentPushToggle />
           <LoanDialog
             equipment={equipmentForLoan}
             instructors={instructors}

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/server";
 import { todayISO } from "@/lib/date";
+import { notifyRestockForEquipment } from "@/lib/push";
 import {
   equipmentFormSchema,
   loanFormSchema,
@@ -90,7 +91,12 @@ export async function createLoan(values: LoanFormValues) {
     status: "대여중",
   });
   if (error) throw new Error(error.message);
+
+  // A checkout may drop availability to/below the restock threshold.
+  await notifyRestockForEquipment(supabase, user.id, parsed.equipment_id);
+
   revalidatePath("/equipment");
+  revalidatePath("/");
 }
 
 export async function returnLoan(id: string, values: LoanReturnValues) {
@@ -182,6 +188,9 @@ export async function returnLoan(id: string, values: LoanReturnValues) {
       }
     }
   }
+
+  // Lost/damaged returns are the main moment a shortage is discovered.
+  await notifyRestockForEquipment(supabase, user.id, loan.equipment_id);
 
   revalidatePath("/equipment");
   revalidatePath("/");

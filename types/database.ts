@@ -130,6 +130,16 @@ export interface EquipmentLoanRow {
   instructor?: { id: UUID; name: string } | null;
 }
 
+export interface PushSubscriptionRow {
+  id: UUID;
+  user_id: UUID;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent: string | null;
+  created_at: string;
+}
+
 export interface MonthlyIncomeRow {
   user_id: UUID;
   ym: string;
