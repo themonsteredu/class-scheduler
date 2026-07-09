@@ -86,6 +86,30 @@ export interface EquipmentStockRow {
   needs_restock: boolean;
 }
 
+export interface EquipmentComponentRow {
+  id: UUID;
+  user_id: UUID;
+  equipment_id: UUID;
+  name: string;
+  unit: string | null;
+  total_quantity: number;
+  low_stock_threshold: number;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EquipmentLoanShortageRow {
+  id: UUID;
+  user_id: UUID;
+  loan_id: UUID;
+  component_id: UUID | null;
+  component_name: string | null;
+  shortage_qty: number;
+  note: string | null;
+  created_at: string;
+}
+
 export interface EquipmentLoanRow {
   id: UUID;
   user_id: UUID;

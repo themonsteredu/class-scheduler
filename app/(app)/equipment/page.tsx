@@ -1,4 +1,4 @@
-import { Plus, PackagePlus } from "lucide-react";
+import { Plus, PackagePlus, Layers } from "lucide-react";
 import { requireUser } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,12 +20,15 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EquipmentDialog } from "@/components/equipment-dialog";
 import { EquipmentRowActions } from "@/components/equipment-row-actions";
+import { EquipmentComponentsDialog } from "@/components/equipment-components-dialog";
 import { LoanDialog } from "@/components/loan-dialog";
 import { LoanRowActions } from "@/components/loan-row-actions";
 import { fmtDate, todayISO } from "@/lib/date";
 import type {
   EquipmentRow,
   EquipmentLoanRow,
+  EquipmentComponentRow,
+  EquipmentLoanShortageRow,
   InstructorRow,
 } from "@/types/database";
 
@@ -34,25 +37,39 @@ export const dynamic = "force-dynamic";
 export default async function EquipmentPage() {
   const { supabase, user } = await requireUser();
 
-  const [{ data: equipmentData }, { data: loanData }, { data: instructorData }] =
-    await Promise.all([
-      supabase
-        .from("equipment")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("active", { ascending: false })
-        .order("name", { ascending: true }),
-      supabase
-        .from("equipment_loans")
-        .select("*, equipment:equipment(id,name), instructor:instructors(id,name)")
-        .eq("user_id", user.id)
-        .order("checked_out_on", { ascending: false }),
-      supabase
-        .from("instructors")
-        .select("id,name,active")
-        .eq("user_id", user.id)
-        .order("name", { ascending: true }),
-    ]);
+  const [
+    { data: equipmentData },
+    { data: loanData },
+    { data: instructorData },
+    { data: componentData },
+    { data: shortageData },
+  ] = await Promise.all([
+    supabase
+      .from("equipment")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("active", { ascending: false })
+      .order("name", { ascending: true }),
+    supabase
+      .from("equipment_loans")
+      .select("*, equipment:equipment(id,name), instructor:instructors(id,name)")
+      .eq("user_id", user.id)
+      .order("checked_out_on", { ascending: false }),
+    supabase
+      .from("instructors")
+      .select("id,name,active")
+      .eq("user_id", user.id)
+      .order("name", { ascending: true }),
+    supabase
+      .from("equipment_components")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("equipment_loan_shortages")
+      .select("*")
+      .eq("user_id", user.id),
+  ]);
 
   const equipment = (equipmentData ?? []) as EquipmentRow[];
   const loans = (loanData ?? []) as unknown as EquipmentLoanRow[];
@@ -60,11 +77,27 @@ export default async function EquipmentPage() {
     InstructorRow,
     "id" | "name" | "active"
   >[];
+  const components = (componentData ?? []) as EquipmentComponentRow[];
+  const shortages = (shortageData ?? []) as EquipmentLoanShortageRow[];
 
   const activeLoans = loans.filter((l) => l.status === "대여중");
   const returnedLoans = loans.filter((l) => l.status === "반납완료");
 
-  // Aggregate: how many of each equipment are currently checked out.
+  // Group components by equipment; shortages by loan.
+  const componentsByEquipment = new Map<string, EquipmentComponentRow[]>();
+  for (const c of components) {
+    const arr = componentsByEquipment.get(c.equipment_id) ?? [];
+    arr.push(c);
+    componentsByEquipment.set(c.equipment_id, arr);
+  }
+  const shortagesByLoan = new Map<string, EquipmentLoanShortageRow[]>();
+  for (const s of shortages) {
+    const arr = shortagesByLoan.get(s.loan_id) ?? [];
+    arr.push(s);
+    shortagesByLoan.set(s.loan_id, arr);
+  }
+
+  // How many of each equipment are currently checked out.
   const checkedOutById = new Map<string, number>();
   for (const l of activeLoans) {
     checkedOutById.set(
@@ -76,15 +109,23 @@ export default async function EquipmentPage() {
   const stock = equipment.map((e) => {
     const checkedOut = checkedOutById.get(e.id) ?? 0;
     const available = e.total_quantity - checkedOut;
+    const comps = componentsByEquipment.get(e.id) ?? [];
+    const shortComps = comps.filter(
+      (c) => c.total_quantity <= c.low_stock_threshold,
+    );
     return {
       equipment: e,
+      comps,
+      shortComps,
       checkedOut,
       available,
       needsRestock: available <= e.low_stock_threshold,
+      needsAttention:
+        available <= e.low_stock_threshold || shortComps.length > 0,
     };
   });
 
-  const restockList = stock.filter((s) => s.equipment.active && s.needsRestock);
+  const restockList = stock.filter((s) => s.equipment.active && s.needsAttention);
   const equipmentForLoan = stock
     .filter((s) => s.equipment.active)
     .map((s) => ({
@@ -128,17 +169,28 @@ export default async function EquipmentPage() {
       {restockList.length > 0 && (
         <Card className="border-destructive/40">
           <CardHeader>
-            <CardTitle className="text-destructive">보충이 필요한 교구</CardTitle>
+            <CardTitle className="text-destructive">보충이 필요한 교구·구성품</CardTitle>
             <CardDescription>
-              여유 수량이 보충 기준 이하입니다. 분실·파손으로 줄어든 수량도 반영됩니다.
+              여유 수량이나 구성품 보유가 보충 기준 이하입니다. 분실·파손으로 줄어든 수량도 반영됩니다.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-2">
               {restockList.map((s) => (
-                <Badge key={s.equipment.id} variant="destructive">
-                  {s.equipment.name} · 여유 {s.available}/{s.equipment.total_quantity}
-                </Badge>
+                <div key={s.equipment.id} className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium">{s.equipment.name}</span>
+                  {s.needsRestock && (
+                    <Badge variant="destructive">
+                      세트 여유 {s.available}/{s.equipment.total_quantity}
+                    </Badge>
+                  )}
+                  {s.shortComps.map((c) => (
+                    <Badge key={c.id} variant="destructive">
+                      {c.name} {c.total_quantity}
+                      {c.unit ?? ""} / 기준 {c.low_stock_threshold}
+                    </Badge>
+                  ))}
+                </div>
               ))}
             </div>
           </CardContent>
@@ -158,7 +210,7 @@ export default async function EquipmentPage() {
             <CardHeader>
               <CardTitle>교구 재고</CardTitle>
               <CardDescription>
-                여유 = 총 보유 − 대여중. 보충 기준 이하면 &quot;보충 필요&quot;로 표시됩니다.
+                여유 = 총 보유 − 대여중. 구성품을 등록하면 부품별 보충 여부도 함께 관리됩니다.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -171,10 +223,9 @@ export default async function EquipmentPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>교구</TableHead>
-                      <TableHead className="hidden sm:table-cell">분류</TableHead>
                       <TableHead className="text-right">여유</TableHead>
                       <TableHead className="text-right hidden sm:table-cell">대여중</TableHead>
-                      <TableHead className="text-right hidden sm:table-cell">총 보유</TableHead>
+                      <TableHead>구성품</TableHead>
                       <TableHead>상태</TableHead>
                       <TableHead className="text-right">관리</TableHead>
                     </TableRow>
@@ -184,12 +235,10 @@ export default async function EquipmentPage() {
                       <TableRow key={s.equipment.id} className={s.equipment.active ? "" : "opacity-50"}>
                         <TableCell>
                           <div className="font-medium">{s.equipment.name}</div>
-                          <div className="text-xs text-muted-foreground sm:hidden">
-                            대여중 {s.checkedOut} / 총 {s.equipment.total_quantity}
+                          <div className="text-xs text-muted-foreground">
+                            {s.equipment.category ?? ""}
+                            {s.equipment.category ? " · " : ""}총 {s.equipment.total_quantity}
                           </div>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell text-muted-foreground">
-                          {s.equipment.category ?? "—"}
                         </TableCell>
                         <TableCell className="text-right tabular-nums font-medium">
                           {s.available}
@@ -197,13 +246,27 @@ export default async function EquipmentPage() {
                         <TableCell className="text-right tabular-nums hidden sm:table-cell text-muted-foreground">
                           {s.checkedOut}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums hidden sm:table-cell text-muted-foreground">
-                          {s.equipment.total_quantity}
+                        <TableCell>
+                          <EquipmentComponentsDialog
+                            equipment={{ id: s.equipment.id, name: s.equipment.name }}
+                            components={s.comps}
+                            trigger={
+                              <Button size="sm" variant="outline">
+                                <Layers className="h-4 w-4" />
+                                구성품 {s.comps.length}
+                                {s.shortComps.length > 0 && (
+                                  <span className="text-destructive">
+                                    ·{s.shortComps.length}
+                                  </span>
+                                )}
+                              </Button>
+                            }
+                          />
                         </TableCell>
                         <TableCell>
                           {!s.equipment.active ? (
                             <Badge variant="muted">숨김</Badge>
-                          ) : s.needsRestock ? (
+                          ) : s.needsAttention ? (
                             <Badge variant="destructive">보충 필요</Badge>
                           ) : (
                             <Badge variant="success">충분</Badge>
@@ -270,7 +333,10 @@ export default async function EquipmentPage() {
                             )}
                           </TableCell>
                           <TableCell className="text-right">
-                            <LoanRowActions loan={l} />
+                            <LoanRowActions
+                              loan={l}
+                              components={componentsByEquipment.get(l.equipment_id) ?? []}
+                            />
                           </TableCell>
                         </TableRow>
                       );
@@ -288,7 +354,7 @@ export default async function EquipmentPage() {
             <CardHeader>
               <CardTitle>반납 이력</CardTitle>
               <CardDescription>
-                반납 시 기록한 분실·파손과 상태 메모를 볼 수 있습니다.
+                반납 시 기록한 분실·파손과 구성품별 부족 내용을 볼 수 있습니다.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -309,31 +375,48 @@ export default async function EquipmentPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {returnedLoans.map((l) => (
-                      <TableRow key={l.id}>
-                        <TableCell className="font-medium">
-                          {l.equipment?.name ?? "—"}
-                          {l.condition_memo && (
-                            <div className="text-xs text-muted-foreground">{l.condition_memo}</div>
-                          )}
-                        </TableCell>
-                        <TableCell>{l.instructor?.name ?? "본인 보관"}</TableCell>
-                        <TableCell className="text-right tabular-nums">{l.quantity}</TableCell>
-                        <TableCell className="hidden sm:table-cell text-muted-foreground tabular-nums">
-                          {fmtDate(l.returned_on)}
-                        </TableCell>
-                        <TableCell>
-                          {l.lost_damaged_qty > 0 ? (
-                            <Badge variant="destructive">분실·파손 {l.lost_damaged_qty}</Badge>
-                          ) : (
-                            <Badge variant="success">정상 반납</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <LoanRowActions loan={l} />
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {returnedLoans.map((l) => {
+                      const sh = (shortagesByLoan.get(l.id) ?? []).filter(
+                        (x) => x.shortage_qty > 0,
+                      );
+                      const clean = l.lost_damaged_qty === 0 && sh.length === 0;
+                      return (
+                        <TableRow key={l.id}>
+                          <TableCell className="font-medium">
+                            {l.equipment?.name ?? "—"}
+                            {l.condition_memo && (
+                              <div className="text-xs text-muted-foreground">{l.condition_memo}</div>
+                            )}
+                            {sh.length > 0 && (
+                              <div className="text-xs text-destructive mt-0.5">
+                                {sh
+                                  .map((x) => `${x.component_name ?? "구성품"} ${x.shortage_qty}`)
+                                  .join(", ")}
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>{l.instructor?.name ?? "본인 보관"}</TableCell>
+                          <TableCell className="text-right tabular-nums">{l.quantity}</TableCell>
+                          <TableCell className="hidden sm:table-cell text-muted-foreground tabular-nums">
+                            {fmtDate(l.returned_on)}
+                          </TableCell>
+                          <TableCell>
+                            {clean ? (
+                              <Badge variant="success">정상 반납</Badge>
+                            ) : (
+                              <Badge variant="destructive">
+                                분실·파손{" "}
+                                {l.lost_damaged_qty +
+                                  sh.reduce((a, x) => a + x.shortage_qty, 0)}
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <LoanRowActions loan={l} />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}

@@ -74,10 +74,30 @@ export const loanFormSchema = z.object({
 });
 export type LoanFormValues = z.input<typeof loanFormSchema>;
 
+export const componentFormSchema = z.object({
+  name: z.string().min(1, "구성품명 필수"),
+  unit: optionalString,
+  total_quantity: requiredNumber(0, 0),
+  low_stock_threshold: requiredNumber(0, 0),
+});
+export type ComponentFormValues = z.input<typeof componentFormSchema>;
+
+export const loanShortageInputSchema = z.object({
+  component_id: z.string().min(1),
+  component_name: optionalString,
+  shortage_qty: requiredNumber(0, 0),
+  note: optionalString,
+});
+export type LoanShortageInput = z.input<typeof loanShortageInputSchema>;
+
 export const loanReturnSchema = z.object({
   returned_on: optionalString,
   lost_damaged_qty: requiredNumber(0, 0),
   condition_memo: optionalString,
+  shortages: z
+    .array(loanShortageInputSchema)
+    .nullish()
+    .transform((v) => v ?? []),
 });
 export type LoanReturnValues = z.input<typeof loanReturnSchema>;
 

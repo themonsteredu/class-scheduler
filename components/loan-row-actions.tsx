@@ -25,13 +25,19 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { todayISO } from "@/lib/date";
 import { loanReturnSchema, type LoanReturnValues } from "@/lib/schemas";
-import type { EquipmentLoanRow } from "@/types/database";
+import type { EquipmentLoanRow, EquipmentComponentRow } from "@/types/database";
 import { returnLoan, deleteLoan } from "@/actions/equipment";
 
-export function LoanRowActions({ loan }: { loan: EquipmentLoanRow }) {
+interface Props {
+  loan: EquipmentLoanRow;
+  components?: EquipmentComponentRow[];
+}
+
+export function LoanRowActions({ loan, components = [] }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const isOut = loan.status === "대여중";
+  const hasComponents = components.length > 0;
 
   const form = useForm<LoanReturnValues>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -40,6 +46,12 @@ export function LoanRowActions({ loan }: { loan: EquipmentLoanRow }) {
       returned_on: todayISO(),
       lost_damaged_qty: 0,
       condition_memo: "",
+      shortages: components.map((c) => ({
+        component_id: c.id,
+        component_name: c.name,
+        shortage_qty: 0,
+        note: "",
+      })),
     },
   });
 
@@ -103,26 +115,77 @@ export function LoanRowActions({ loan }: { loan: EquipmentLoanRow }) {
               <Label htmlFor="returned_on">반납일</Label>
               <Input id="returned_on" type="date" {...form.register("returned_on")} />
             </div>
+
+            {hasComponents ? (
+              <div className="flex flex-col gap-2">
+                <Label>구성품별 부족·파손</Label>
+                <p className="text-xs text-muted-foreground -mt-1">
+                  돌아오지 않았거나 손상된 수량을 입력하세요. 해당 구성품 보유 수량에서 빠집니다.
+                </p>
+                <div className="flex flex-col gap-2 max-h-[40vh] overflow-y-auto pr-1">
+                  {components.map((c, i) => (
+                    <div key={c.id} className="rounded-md border p-2 flex flex-col gap-1.5">
+                      <input
+                        type="hidden"
+                        {...form.register(`shortages.${i}.component_id` as const)}
+                      />
+                      <input
+                        type="hidden"
+                        {...form.register(`shortages.${i}.component_name` as const)}
+                      />
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium">
+                          {c.name}
+                          {c.unit ? ` (${c.unit})` : ""}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <Label
+                            htmlFor={`sh-${c.id}`}
+                            className="text-xs text-muted-foreground"
+                          >
+                            부족
+                          </Label>
+                          <Input
+                            id={`sh-${c.id}`}
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            className="w-20"
+                            {...form.register(`shortages.${i}.shortage_qty` as const)}
+                          />
+                        </div>
+                      </div>
+                      <Input
+                        placeholder="메모 (예: 날 부러짐)"
+                        {...form.register(`shortages.${i}.note` as const)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="lost_damaged_qty">분실·파손 수량</Label>
+                <Input
+                  id="lost_damaged_qty"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={loan.quantity}
+                  {...form.register("lost_damaged_qty")}
+                />
+                <p className="text-xs text-muted-foreground">
+                  입력한 수량만큼 총 보유 수량에서 빠져 &quot;보충 필요&quot; 판단에 반영됩니다.
+                </p>
+              </div>
+            )}
+
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="lost_damaged_qty">분실·파손 수량</Label>
-              <Input
-                id="lost_damaged_qty"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={loan.quantity}
-                {...form.register("lost_damaged_qty")}
-              />
-              <p className="text-xs text-muted-foreground">
-                입력한 수량만큼 총 보유 수량에서 빠져 &quot;보충 필요&quot; 판단에 반영됩니다.
-              </p>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="condition_memo">상태 메모 (부족·손상 내용)</Label>
+              <Label htmlFor="condition_memo">상태 메모</Label>
               <Textarea
                 id="condition_memo"
                 rows={2}
-                placeholder="예: 카드 3장 분실, 상자 찢어짐"
+                placeholder="예: 전반적으로 양호"
                 {...form.register("condition_memo")}
               />
             </div>

@@ -7,9 +7,11 @@ import {
   equipmentFormSchema,
   loanFormSchema,
   loanReturnSchema,
+  componentFormSchema,
   type EquipmentFormValues,
   type LoanFormValues,
   type LoanReturnValues,
+  type ComponentFormValues,
 } from "@/lib/schemas";
 
 function issuesToMessage(issues: { path: PropertyKey[]; message: string }[]) {
@@ -108,7 +110,14 @@ export async function returnLoan(id: string, values: LoanReturnValues) {
   if (!loan) throw new Error("대여 기록을 찾을 수 없습니다.");
   if (loan.status === "반납완료") throw new Error("이미 반납된 기록입니다.");
 
-  const lost = Math.min(parsed.lost_damaged_qty, loan.quantity);
+  const shortages = (parsed.shortages ?? []).filter((s) => s.shortage_qty > 0);
+  const hasComponentShortages = shortages.length > 0;
+
+  // For component kits the shortage is tracked per component; the equipment-level
+  // lost_damaged_qty is only used for simple (component-less) items.
+  const lost = hasComponentShortages
+    ? 0
+    : Math.min(parsed.lost_damaged_qty, loan.quantity);
 
   const { error } = await supabase
     .from("equipment_loans")
@@ -122,8 +131,8 @@ export async function returnLoan(id: string, values: LoanReturnValues) {
     .eq("user_id", user.id);
   if (error) throw new Error(error.message);
 
-  // Lost/damaged items are no longer usable → shrink on-hand total so the
-  // "보충 필요" alert can trigger.
+  // Simple item: lost/damaged units are no longer usable → shrink on-hand total
+  // so the "보충 필요" alert can trigger.
   if (lost > 0) {
     const { data: eq } = await supabase
       .from("equipment")
@@ -141,7 +150,41 @@ export async function returnLoan(id: string, values: LoanReturnValues) {
     }
   }
 
+  // Component kit: record each component shortage and shrink that component's
+  // on-hand total so its own "보충 필요" flag can trigger.
+  if (hasComponentShortages) {
+    const { error: shErr } = await supabase.from("equipment_loan_shortages").insert(
+      shortages.map((s) => ({
+        user_id: user.id,
+        loan_id: id,
+        component_id: s.component_id,
+        component_name: s.component_name ?? null,
+        shortage_qty: s.shortage_qty,
+        note: s.note ?? null,
+      })),
+    );
+    if (shErr) throw new Error(shErr.message);
+
+    for (const s of shortages) {
+      const { data: comp } = await supabase
+        .from("equipment_components")
+        .select("total_quantity")
+        .eq("id", s.component_id)
+        .eq("user_id", user.id)
+        .single();
+      if (comp) {
+        const next = Math.max(0, (comp.total_quantity ?? 0) - s.shortage_qty);
+        await supabase
+          .from("equipment_components")
+          .update({ total_quantity: next })
+          .eq("id", s.component_id)
+          .eq("user_id", user.id);
+      }
+    }
+  }
+
   revalidatePath("/equipment");
+  revalidatePath("/");
 }
 
 export async function deleteLoan(id: string) {
@@ -153,4 +196,69 @@ export async function deleteLoan(id: string) {
     .eq("user_id", user.id);
   if (error) throw new Error(error.message);
   revalidatePath("/equipment");
+  revalidatePath("/");
+}
+
+// ---------- Components (구성품) ----------
+
+export async function createComponent(
+  equipmentId: string,
+  values: ComponentFormValues,
+) {
+  const result = componentFormSchema.safeParse(values);
+  if (!result.success) throw new Error(`입력 오류 — ${issuesToMessage(result.error.issues)}`);
+  const parsed = result.data;
+  const { supabase, user } = await requireUser();
+
+  // New component goes to the end.
+  const { count } = await supabase
+    .from("equipment_components")
+    .select("id", { count: "exact", head: true })
+    .eq("equipment_id", equipmentId)
+    .eq("user_id", user.id);
+
+  const { error } = await supabase.from("equipment_components").insert({
+    user_id: user.id,
+    equipment_id: equipmentId,
+    name: parsed.name,
+    unit: parsed.unit ?? null,
+    total_quantity: parsed.total_quantity,
+    low_stock_threshold: parsed.low_stock_threshold,
+    sort_order: count ?? 0,
+  });
+  if (error) throw new Error(error.message);
+  revalidatePath("/equipment");
+  revalidatePath("/");
+}
+
+export async function updateComponent(id: string, values: ComponentFormValues) {
+  const result = componentFormSchema.safeParse(values);
+  if (!result.success) throw new Error(`입력 오류 — ${issuesToMessage(result.error.issues)}`);
+  const parsed = result.data;
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase
+    .from("equipment_components")
+    .update({
+      name: parsed.name,
+      unit: parsed.unit ?? null,
+      total_quantity: parsed.total_quantity,
+      low_stock_threshold: parsed.low_stock_threshold,
+    })
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/equipment");
+  revalidatePath("/");
+}
+
+export async function deleteComponent(id: string) {
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase
+    .from("equipment_components")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/equipment");
+  revalidatePath("/");
 }
