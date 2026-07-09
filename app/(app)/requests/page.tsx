@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { Plus } from "lucide-react";
 import { requireUser } from "@/lib/supabase/server";
 import { monthRange, fmtTimeRange } from "@/lib/date";
-import { fmtKRW } from "@/lib/money";
+import { fmtKRW, sumExtras } from "@/lib/money";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,11 +22,13 @@ import {
 } from "@/components/ui/table";
 import { StatusBadge } from "@/components/status-badge";
 import { RequestFilters } from "@/components/request-filters";
+import { ProgramMaterialManager } from "@/components/program-material-manager";
 import { STATUS_VALUES, type RequestStatus } from "@/lib/schemas";
 import type {
   ClassRequestRow,
   ClientRow,
   InstructorRow,
+  ProgramMaterialFeeRow,
 } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +49,7 @@ export default async function RequestsPage({
   const params = await searchParams;
   const { supabase, user } = await requireUser();
 
-  const [clientsRes, instructorsRes] = await Promise.all([
+  const [clientsRes, instructorsRes, materialRes] = await Promise.all([
     supabase
       .from("clients")
       .select("id,name")
@@ -58,6 +60,7 @@ export default async function RequestsPage({
       .select("id,name")
       .eq("user_id", user.id)
       .order("name"),
+    supabase.from("program_material_fees").select("*").eq("user_id", user.id),
   ]);
 
   const clients = (clientsRes.data ?? []) as Pick<ClientRow, "id" | "name">[];
@@ -65,6 +68,7 @@ export default async function RequestsPage({
     InstructorRow,
     "id" | "name"
   >[];
+  const materialFees = (materialRes.data ?? []) as ProgramMaterialFeeRow[];
 
   let query = supabase
     .from("class_requests")
@@ -90,7 +94,17 @@ export default async function RequestsPage({
   const { data } = await query;
   const rows = (data ?? []) as unknown as ClassRequestRow[];
 
-  const totalFee = rows.reduce((acc, r) => acc + Number(r.fee_total ?? 0), 0);
+  // 내 수입 = 재료비(부가항목 중 내 수입).
+  const totalFee = rows.reduce((acc, r) => acc + sumExtras(r.extra_fees, "me"), 0);
+
+  const programNames = [
+    ...new Set(
+      [
+        ...materialFees.map((m) => m.program_name),
+        ...rows.map((r) => r.subject).filter((s): s is string => Boolean(s)),
+      ].map((s) => s.trim()),
+    ),
+  ].sort();
 
   return (
     <div className="flex flex-col gap-6">
@@ -101,11 +115,22 @@ export default async function RequestsPage({
             총 {rows.length}건 · 내 수입 합계 {fmtKRW(totalFee)}
           </p>
         </div>
-        <Button asChild size="sm" className="sm:size-default">
-          <Link href="/requests/new">
-            <Plus className="h-4 w-4" /> 의뢰 등록
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <ProgramMaterialManager
+            materialFees={materialFees}
+            programNames={programNames}
+            trigger={
+              <Button size="sm" variant="outline">
+                재료비 규칙
+              </Button>
+            }
+          />
+          <Button asChild size="sm" className="sm:size-default">
+            <Link href="/requests/new">
+              <Plus className="h-4 w-4" /> 의뢰 등록
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -190,7 +215,7 @@ export default async function RequestsPage({
                       </Link>
                     </TableCell>
                     <TableCell className="text-right tabular-nums whitespace-nowrap">
-                      {fmtKRW(r.fee_total)}
+                      {fmtKRW(sumExtras(r.extra_fees, "me"))}
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={r.status} />

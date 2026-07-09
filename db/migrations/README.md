@@ -9,6 +9,7 @@ Supabase 대시보드 → **SQL Editor**에서 아래 순서대로 한 번씩 �
 | 2 | `0002_equipment_components.sql` | 구성품(`equipment_components`), 반납 부족 기록(`equipment_loan_shortages`), RLS |
 | 3 | `0003_push_subscriptions.sql` | 웹 푸시 알림 구독(`push_subscriptions`), RLS |
 | 4 | `0004_program_equipment.sql` | 프로그램(과목)별 교구 매핑(`program_equipment`), RLS |
+| 5 | `0005_sessions_region_material.sql` | 수업 차시·지역 컬럼 + 프로그램별 재료비 규칙(`program_material_fees`), RLS |
 
 ## 실행 방법
 1. Supabase 프로젝트 → 왼쪽 메뉴 **SQL Editor** → **New query**

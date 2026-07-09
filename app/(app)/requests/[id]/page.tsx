@@ -8,6 +8,7 @@ import type {
   ClassRequestRow,
   ClientRow,
   InstructorRow,
+  ProgramMaterialFeeRow,
 } from "@/types/database";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,7 @@ export default async function RequestDetailPage({
   const { id } = await params;
   const { supabase, user } = await requireUser();
 
-  const [reqRes, clientsRes, instructorsRes] = await Promise.all([
+  const [reqRes, clientsRes, instructorsRes, materialRes] = await Promise.all([
     supabase
       .from("class_requests")
       .select("*, client:clients(id,name), instructor:instructors(id,name)")
@@ -38,6 +39,7 @@ export default async function RequestDetailPage({
       .eq("user_id", user.id)
       .order("active", { ascending: false })
       .order("name"),
+    supabase.from("program_material_fees").select("*").eq("user_id", user.id),
   ]);
 
   if (!reqRes.data) notFound();
@@ -47,6 +49,7 @@ export default async function RequestDetailPage({
     InstructorRow,
     "id" | "name" | "active"
   >[];
+  const materialFees = (materialRes.data ?? []) as ProgramMaterialFeeRow[];
 
   return (
     <div className="flex flex-col gap-6">
@@ -69,6 +72,7 @@ export default async function RequestDetailPage({
         request={request}
         clients={clients}
         instructors={instructors}
+        materialFees={materialFees}
       />
     </div>
   );

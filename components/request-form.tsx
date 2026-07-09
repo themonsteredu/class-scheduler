@@ -27,17 +27,32 @@ import {
 } from "@/components/ui/select";
 import { KakaoPasteParser } from "@/components/kakao-paste-parser";
 import { createRequest, deleteRequest, updateRequest } from "@/actions/requests";
-import type { ClassRequestRow, ClientRow, InstructorRow } from "@/types/database";
+import { fmtKRW } from "@/lib/money";
+import {
+  REGIONS,
+  sessionFee,
+  materialFee,
+  fmtMaterialRule,
+  MATERIAL_FEE_LABEL,
+} from "@/lib/pricing";
+import type {
+  ClassRequestRow,
+  ClientRow,
+  InstructorRow,
+  ProgramMaterialFeeRow,
+} from "@/types/database";
 
 interface Props {
   mode: "new" | "edit";
   request?: ClassRequestRow;
   clients: Pick<ClientRow, "id" | "name">[];
   instructors: Pick<InstructorRow, "id" | "name" | "active">[];
+  materialFees: ProgramMaterialFeeRow[];
 }
 
 const SELF_INSTRUCTOR = "__self__";
 const NO_CLIENT = "__none__";
+const NO_REGION = "__none__";
 
 const CONFIDENCE_VARIANTS: Record<string, "success" | "warning" | "muted"> = {
   high: "success",
@@ -45,7 +60,13 @@ const CONFIDENCE_VARIANTS: Record<string, "success" | "warning" | "muted"> = {
   low: "muted",
 };
 
-export function RequestForm({ mode, request, clients, instructors }: Props) {
+export function RequestForm({
+  mode,
+  request,
+  clients,
+  instructors,
+  materialFees,
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [confidence, setConfidence] = useState<Record<string, string>>({});
@@ -68,6 +89,8 @@ export function RequestForm({ mode, request, clients, instructors }: Props) {
       subject: request?.subject ?? "",
       grade: request?.grade ?? "",
       student_count: request?.student_count ?? null,
+      sessions: request?.sessions ?? 1,
+      region: request?.region ?? "",
       fee_total: request?.fee_total ?? null,
       instructor_payout: 0,
       extra_fees: [],
@@ -90,8 +113,6 @@ export function RequestForm({ mode, request, clients, instructors }: Props) {
     if (result.grade) form.setValue("grade", result.grade);
     if (result.student_count != null)
       form.setValue("student_count", result.student_count);
-    if (result.fee_guess != null)
-      form.setValue("fee_total", result.fee_guess);
     if (result.client_name_guess) {
       const match = clients.find(
         (c) =>
@@ -124,14 +145,36 @@ export function RequestForm({ mode, request, clients, instructors }: Props) {
     );
   }
 
+  // Derived money: 강사료(업체→강사) = 차시 × 지역요율, 재료비(내 수입) = 규칙 기반.
+  function computeMoney(values: RequestFormValues) {
+    const region = values.region && values.region !== "" ? values.region : null;
+    const payout = sessionFee(region, Number(values.sessions) || 0);
+    const rule = materialFees.find(
+      (m) => m.program_name === (values.subject ?? "").trim(),
+    );
+    const mat = materialFee(rule, Number(values.student_count) || 0);
+    return { payout, mat };
+  }
+
   function onSubmit(values: RequestFormValues) {
+    const { payout, mat } = computeMoney(values);
+    const finalValues: RequestFormValues = {
+      ...values,
+      instructor_payout: payout,
+      // 사장님은 강사료를 거치지 않으므로 fee_total = 강사료 (수수료 0, 재료비만 내 수입)
+      fee_total: payout,
+      extra_fees:
+        mat > 0
+          ? [{ label: MATERIAL_FEE_LABEL, amount: mat, paid_to: "me" as const }]
+          : [],
+    };
     startTransition(async () => {
       try {
         if (mode === "new") {
-          await createRequest(values, parsedMeta);
+          await createRequest(finalValues, parsedMeta);
           // redirect in server action will throw NEXT_REDIRECT
         } else if (request) {
-          await updateRequest(request.id, values);
+          await updateRequest(request.id, finalValues);
           toast.success("저장되었습니다");
           router.refresh();
         }
@@ -258,11 +301,37 @@ export function RequestForm({ mode, request, clients, instructors }: Props) {
           />
         </Field>
 
-        <Field label={<>내 수입 (원) <ConfidenceBadge field="fee_guess" /></>}>
+        <Field label="차시">
           <Input
             type="number"
             inputMode="numeric"
-            {...form.register("fee_total")}
+            min={1}
+            {...form.register("sessions")}
+          />
+        </Field>
+
+        <Field label="지역">
+          <Controller
+            control={form.control}
+            name="region"
+            render={({ field }) => (
+              <Select
+                value={field.value && field.value !== "" ? field.value : NO_REGION}
+                onValueChange={(v) => field.onChange(v === NO_REGION ? "" : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="지역 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_REGION}>(미지정)</SelectItem>
+                  {REGIONS.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           />
         </Field>
 
@@ -290,6 +359,14 @@ export function RequestForm({ mode, request, clients, instructors }: Props) {
           />
         </Field>
       </div>
+
+      <MoneySummary
+        region={watched.region}
+        sessions={watched.sessions}
+        subject={watched.subject}
+        studentCount={watched.student_count}
+        materialFees={materialFees}
+      />
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="memo">메모</Label>
@@ -351,6 +428,60 @@ function Field({
     <div className="flex flex-col gap-1.5">
       <Label className="flex items-center">{label}</Label>
       {children}
+    </div>
+  );
+}
+
+function MoneySummary({
+  region,
+  sessions,
+  subject,
+  studentCount,
+  materialFees,
+}: {
+  region?: unknown;
+  sessions?: unknown;
+  subject?: unknown;
+  studentCount?: unknown;
+  materialFees: ProgramMaterialFeeRow[];
+}) {
+  const reg = region && region !== "" ? String(region) : null;
+  const subjectStr = String(subject ?? "").trim();
+  const payout = sessionFee(reg, Number(sessions) || 0);
+  const rule = materialFees.find((m) => m.program_name === subjectStr);
+  const mat = materialFee(rule, Number(studentCount) || 0);
+
+  return (
+    <div className="rounded-md border bg-muted/30 p-3 flex flex-col gap-2 text-sm">
+      <div className="flex items-center justify-between">
+        <span className="text-muted-foreground">강사료 (업체 → 강사)</span>
+        <span className="font-medium tabular-nums">
+          {payout > 0 ? fmtKRW(payout) : "—"}
+          {reg && Number(sessions) > 0 && (
+            <span className="text-xs text-muted-foreground font-normal">
+              {" "}
+              ({reg} × {Number(sessions)}차시)
+            </span>
+          )}
+        </span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-muted-foreground">재료비 (내 수입)</span>
+        <span className="font-medium tabular-nums">
+          {mat > 0 ? fmtKRW(mat) : "—"}
+          {rule && (
+            <span className="text-xs text-muted-foreground font-normal">
+              {" "}
+              ({fmtMaterialRule(rule)})
+            </span>
+          )}
+        </span>
+      </div>
+      {subjectStr && !rule && (
+        <p className="text-xs text-muted-foreground">
+          &quot;{subjectStr}&quot; 재료비 규칙이 없어요. 수업 목록 상단 &quot;재료비 규칙&quot;에서 설정하면 자동 반영됩니다.
+        </p>
+      )}
     </div>
   );
 }

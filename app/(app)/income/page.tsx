@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { requireUser } from "@/lib/supabase/server";
 import { monthRange, thisMonthKST } from "@/lib/date";
-import { fmtKRW } from "@/lib/money";
+import { fmtKRW, sumExtras } from "@/lib/money";
 import {
   Card,
   CardContent,
@@ -44,24 +44,29 @@ export default async function IncomePage({
 
   const rows = (data ?? []) as unknown as ClassRequestRow[];
 
-  const totalIncome = rows.reduce((a, r) => a + Number(r.fee_total ?? 0), 0);
+  // 내 수입 = 재료비(부가항목 중 내 수입). 강사료는 업체가 강사에게 직접 지급.
+  const myIncomeOf = (r: ClassRequestRow) => sumExtras(r.extra_fees, "me");
+  const payoutOf = (r: ClassRequestRow) => Number(r.instructor_payout ?? 0);
+
+  const totalIncome = rows.reduce((a, r) => a + myIncomeOf(r), 0);
+  const totalPayout = rows.reduce((a, r) => a + payoutOf(r), 0);
   const classCount = rows.length;
 
-  // by instructor
+  // by instructor — 강사료(그 강사가 번 돈)
   const byInstructor = new Map<
     string,
-    { name: string; count: number; income: number }
+    { name: string; count: number; payout: number }
   >();
   for (const r of rows) {
     const key = r.instructor_id ?? "__self__";
     const name = r.instructor?.name ?? "본인 직접";
-    const cur = byInstructor.get(key) ?? { name, count: 0, income: 0 };
+    const cur = byInstructor.get(key) ?? { name, count: 0, payout: 0 };
     cur.count += 1;
-    cur.income += Number(r.fee_total ?? 0);
+    cur.payout += payoutOf(r);
     byInstructor.set(key, cur);
   }
 
-  // by client
+  // by client — 내 수입(재료비)
   const byClient = new Map<
     string,
     { name: string; count: number; income: number }
@@ -71,7 +76,7 @@ export default async function IncomePage({
     const name = r.client?.name ?? "(업체 미정)";
     const cur = byClient.get(key) ?? { name, count: 0, income: 0 };
     cur.count += 1;
-    cur.income += Number(r.fee_total ?? 0);
+    cur.income += myIncomeOf(r);
     byClient.set(key, cur);
   }
 
@@ -91,8 +96,9 @@ export default async function IncomePage({
         </Suspense>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
-        <Kpi title="내 수입 합계" value={fmtKRW(totalIncome)} />
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <Kpi title="내 수입 (재료비)" value={fmtKRW(totalIncome)} />
+        <Kpi title="강사 지급 총액" value={fmtKRW(totalPayout)} hint="업체가 강사에게" />
         <Kpi title="수업 건수" value={`${classCount}건`} />
       </div>
 
@@ -118,7 +124,7 @@ export default async function IncomePage({
                       <TableHead>날짜</TableHead>
                       <TableHead>학교·과목</TableHead>
                       <TableHead className="hidden sm:table-cell">강사</TableHead>
-                      <TableHead className="hidden md:table-cell">업체</TableHead>
+                      <TableHead className="text-right hidden md:table-cell">강사료</TableHead>
                       <TableHead className="text-right">내 수입</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -132,6 +138,8 @@ export default async function IncomePage({
                           <div>{r.school_name ?? "—"}</div>
                           <div className="text-xs text-muted-foreground">
                             {r.subject ?? "—"}
+                            {r.region ? ` · ${r.region}` : ""}
+                            {r.sessions ? ` · ${r.sessions}차시` : ""}
                           </div>
                           <div className="text-xs text-muted-foreground sm:hidden">
                             {r.instructor?.name ?? "본인 직접"}
@@ -141,11 +149,11 @@ export default async function IncomePage({
                         <TableCell className="hidden sm:table-cell">
                           {r.instructor?.name ?? "본인 직접"}
                         </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          {r.client?.name ?? "—"}
+                        <TableCell className="text-right tabular-nums hidden md:table-cell text-muted-foreground whitespace-nowrap">
+                          {fmtKRW(payoutOf(r))}
                         </TableCell>
                         <TableCell className="text-right tabular-nums font-medium whitespace-nowrap">
-                          {fmtKRW(r.fee_total)}
+                          {fmtKRW(myIncomeOf(r))}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -170,12 +178,12 @@ export default async function IncomePage({
                     <TableRow>
                       <TableHead>강사</TableHead>
                       <TableHead className="text-right">수업 수</TableHead>
-                      <TableHead className="text-right">내 수입</TableHead>
+                      <TableHead className="text-right">강사료</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {[...byInstructor.values()]
-                      .sort((a, b) => b.income - a.income)
+                      .sort((a, b) => b.payout - a.payout)
                       .map((row) => (
                         <TableRow key={row.name}>
                           <TableCell className="font-medium">{row.name}</TableCell>
@@ -183,7 +191,7 @@ export default async function IncomePage({
                             {row.count}
                           </TableCell>
                           <TableCell className="text-right tabular-nums font-medium">
-                            {fmtKRW(row.income)}
+                            {fmtKRW(row.payout)}
                           </TableCell>
                         </TableRow>
                       ))}
