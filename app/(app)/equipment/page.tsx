@@ -1,4 +1,5 @@
-import { Plus, PackagePlus, Layers } from "lucide-react";
+import Link from "next/link";
+import { Plus, PackagePlus, Layers, CalendarDays } from "lucide-react";
 import { requireUser } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -155,7 +156,12 @@ export default async function EquipmentPage() {
             )}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button asChild size="sm" variant="outline">
+            <Link href="/equipment/schedule">
+              <CalendarDays className="h-4 w-4" /> 요일별 준비
+            </Link>
+          </Button>
           <EquipmentPushToggle />
           <LoanDialog
             equipment={equipmentForLoan}
