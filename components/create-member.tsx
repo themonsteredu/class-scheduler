@@ -34,22 +34,20 @@ export function CreateMember({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [link, setLink] = useState(NEW);
 
   function submit() {
+    if (pending) return;
     startTransition(async () => {
       try {
         await createInstructorAccount({
           email,
-          password,
           name,
           instructorId: link === NEW ? null : link,
         });
-        toast.success("강사 계정이 생성되었습니다");
+        toast.success("강사 계정을 연결했습니다");
         setEmail("");
-        setPassword("");
         setName("");
         setLink(NEW);
         setOpen(false);
@@ -60,44 +58,46 @@ export function CreateMember({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(value) => !pending && setOpen(value)}>
       <DialogTrigger asChild>
         <Button size="sm">
-          <UserPlus className="h-4 w-4" /> 강사 계정 만들기
+          <UserPlus className="h-4 w-4" /> 강사 계정 연결
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>강사 계정 만들기</DialogTitle>
+          <DialogTitle>강사 계정 연결</DialogTitle>
           <DialogDescription>
-            이메일과 비밀번호를 정해서 만들면 강사는 이메일 인증 없이 바로 로그인할 수 있어요.
-            만든 이메일·비밀번호를 강사에게 알려주세요.
+            가입과 이메일 인증을 마친 MOAKIT 계정을 강사 명단에 연결하세요.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-3">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            submit();
+          }}
+          className="flex flex-col gap-3"
+        >
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="cm-email">이메일 (아이디)</Label>
+            <Label htmlFor="cm-email">MOAKIT 이메일</Label>
             <Input
               id="cm-email"
               type="email"
+              autoComplete="email"
+              required
+              disabled={pending}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="instructor@example.com"
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="cm-pw">비밀번호 (6자 이상)</Label>
-            <Input
-              id="cm-pw"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="강사에게 알려줄 임시 비밀번호"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
             <Label htmlFor="cm-name">강사 이름</Label>
             <Input
               id="cm-name"
+              autoComplete="name"
+              required={link === NEW}
+              disabled={pending}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="홍길동"
@@ -105,7 +105,7 @@ export function CreateMember({
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>강사 명단 연결</Label>
-            <Select value={link} onValueChange={setLink}>
+            <Select value={link} onValueChange={setLink} disabled={pending}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -119,16 +119,16 @@ export function CreateMember({
               </SelectContent>
             </Select>
           </div>
-        </div>
-        <DialogFooter className="gap-2 pt-2">
-          <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-            취소
-          </Button>
-          <Button onClick={submit} disabled={pending}>
-            {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-            만들기
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="gap-2 pt-2">
+            <Button type="button" variant="outline" disabled={pending} onClick={() => setOpen(false)}>
+              취소
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {pending ? "연결 중…" : "연결하기"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
