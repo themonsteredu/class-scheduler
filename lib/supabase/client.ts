@@ -45,6 +45,9 @@ export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { global: { fetch: fetchWithAuthTimeout } },
+    {
+      db: { schema: "class_scheduler" },
+      global: { fetch: fetchWithAuthTimeout },
+    },
   );
 }

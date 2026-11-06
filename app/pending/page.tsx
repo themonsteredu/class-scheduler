@@ -17,17 +17,17 @@ export default async function PendingPage() {
   if (profile?.role === "admin") redirect("/");
   if (profile?.role === "instructor" && profile.instructor_id) redirect("/me");
 
-  const setupNeeded = !profile;
+  const connectionFailed = !profile;
 
   return (
     <div className="min-h-svh flex items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>{setupNeeded ? "설정이 필요해요" : "승인 대기 중"}</CardTitle>
+          <CardTitle>{connectionFailed ? "계정 연결을 확인해 주세요" : "승인 대기 중"}</CardTitle>
           <CardDescription>
-            {setupNeeded
-              ? "역할 설정(profiles) 마이그레이션이 아직 실행되지 않았어요. Supabase에서 0006 SQL을 실행하면 사장님 계정이 관리자로 지정됩니다."
-              : "회원가입이 접수되었습니다. 사장님이 승인하면 본인 스케쥴·수입·교구를 볼 수 있어요."}
+            {connectionFailed
+              ? "스케줄러 계정을 연결하지 못했습니다. 새로고침한 뒤 다시 시도해 주세요."
+              : "강사 가입 요청이 접수되었습니다. 원장님이 승인하면 배정된 수업·수입·교구를 확인할 수 있어요."}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">

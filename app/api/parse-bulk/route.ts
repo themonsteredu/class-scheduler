@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
-import { requireUser } from "@/lib/supabase/server";
+import { getProfile } from "@/lib/supabase/server";
 import { parseResultSchema } from "@/lib/schemas";
 import { todayISO } from "@/lib/date";
 
@@ -132,9 +132,18 @@ async function callClaude(
 
 export async function POST(request: Request) {
   try {
-    await requireUser();
+    const { user, profile } = await getProfile();
+    if (!user) {
+      return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+    }
+    if (profile?.role !== "admin") {
+      return NextResponse.json({ error: "관리자만 사용할 수 있습니다." }, { status: 403 });
+    }
   } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: "스케줄러 권한을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요." },
+      { status: 503 },
+    );
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;

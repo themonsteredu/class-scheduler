@@ -30,7 +30,7 @@ export function AppSidebar({ email }: { email: string | null }) {
 
   async function signOut() {
     const supabase = createClient();
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     toast.success("로그아웃 되었습니다");
     router.replace("/login");
     router.refresh();

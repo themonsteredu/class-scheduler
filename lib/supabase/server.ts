@@ -1,4 +1,6 @@
+import "server-only";
 import { createServerClient } from "@supabase/ssr";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ProfileRow } from "@/types/database";
@@ -10,6 +12,7 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      db: { schema: "class_scheduler" },
       cookies: {
         getAll() {
           return cookieStore.getAll();
@@ -28,37 +31,51 @@ export async function createClient() {
   );
 }
 
-export async function requireUser() {
+// Verify the Auth user at the data-access boundary. React cache only deduplicates
+// these checks within the current render; it does not share sessions across users.
+const getAuthenticatedContext = cache(async () => {
   const supabase = await createClient();
-  // Session is verified in middleware. Here we just read the cookie (no network call)
-  // to avoid duplicate auth latency on every page render.
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user) redirect("/login");
-  return { supabase, user: session.user };
+    data: { user },
+  } = await supabase.auth.getUser();
+  return { supabase, user };
+});
+
+export async function requireUser() {
+  const { supabase, user } = await getAuthenticatedContext();
+  if (!user) redirect("/login");
+  return { supabase, user };
 }
 
-// Loads the current user's profile (role, instructor link).
-// profile is null before the profiles migration is applied.
-export async function getProfile() {
-  const supabase = await createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.user)
+// Membership is created only when a signed-in user enters this scheduler.
+// The guarded RPC always creates a pending member; the owner is seeded separately.
+export const getProfile = cache(async () => {
+  const { supabase, user } = await getAuthenticatedContext();
+  if (!user)
     return { supabase, user: null, profile: null as ProfileRow | null };
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
     .select("*")
-    .eq("id", session.user.id)
+    .eq("id", user.id)
     .maybeSingle();
-  return {
-    supabase,
-    user: session.user,
-    profile: (data ?? null) as ProfileRow | null,
-  };
-}
+  if (error) throw new Error("스케줄러 회원 정보를 불러오지 못했습니다.");
+
+  let profile = (data ?? null) as ProfileRow | null;
+  if (!profile) {
+    const displayName = user.user_metadata?.display_name;
+    const { data: created, error: createError } = await supabase
+      .rpc("ensure_profile", {
+        p_display_name: typeof displayName === "string" ? displayName : null,
+      })
+      .single();
+    if (createError || !created) {
+      throw new Error("스케줄러 가입 요청을 등록하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+    }
+    profile = created as ProfileRow;
+  }
+
+  return { supabase, user, profile };
+});
 
 export async function requireAdmin() {
   const { supabase, user, profile } = await getProfile();
