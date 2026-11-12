@@ -1,5 +1,6 @@
 -- Apply AFTER the isolated schema + verified owner seed, and only after a live
--- PGRST106 probe confirms these original eight exposed schemas are still current.
+-- PGRST106 probe confirms the exposed schema list below is still current (rechecked 2026-11-12:
+-- afterschool and afterschool_private had been added since this file was drafted).
 -- CLI-generated filename: supabase 3.0.0 migration new scheduler_expose_schema.
 -- This preserves the existing list/order and appends only class_scheduler.
 -- class_scheduler_private MUST NEVER be exposed.
@@ -17,6 +18,6 @@ end;
 $$;
 
 alter role authenticator set pgrst.db_schemas =
-  'public, graphql_public, lms, edu, ops, moalab, moasem, ai_upcycling, class_scheduler';
+  'public, graphql_public, lms, edu, ops, moalab, moasem, ai_upcycling, afterschool, afterschool_private, class_scheduler';
 notify pgrst, 'reload config';
 notify pgrst, 'reload schema';

@@ -20,7 +20,7 @@ The fresh installation below replaces that bootstrap path.
 | --- | --- | --- |
 | 1 | `migrations/20261105121704_scheduler_isolated_schema.sql` | Creates the two new schemas, the original 11 scheduler tables and two views, RLS, guarded RPCs, and scoped grants. |
 | 2 | `seed_scheduler_owner.sql` | Seeds only the independently verified, confirmed Auth account as the scheduler owner. |
-| 3 | `migrations/20261105122240_scheduler_expose_schema.sql` | Preserves the eight existing API schemas and appends `class_scheduler`. |
+| 3 | `migrations/20261105122240_scheduler_expose_schema.sql` | Preserves the existing API schemas and appends `class_scheduler`. |
 | 4 | `verify_isolated_schema.sql` | Runs read-only catalog, owner, and nonmember authorization checks and rolls back. |
 
 The two migration filenames were generated with Supabase CLI 3.0.0
@@ -52,7 +52,7 @@ Immediately before applying the exposure migration, recheck the live API's
 exposed schema list. The verified baseline at this installation was:
 
 ```text
-public, graphql_public, lms, edu, ops, moalab, moasem, ai_upcycling
+public, graphql_public, lms, edu, ops, moalab, moasem, ai_upcycling, afterschool, afterschool_private
 ```
 
 The second migration preserves that order and appends only `class_scheduler`.
